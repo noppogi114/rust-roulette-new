@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>POGGI ADMIN PANEL</title>
+    <style>
+        body { font-family: sans-serif; background-color: #1a1a1a; color: white; padding: 20px; }
+        .card { background: #2a2a2a; border-radius: 10px; padding: 20px; margin-bottom: 20px; border: 1px solid #444; }
+        h2 { margin-top: 0; color: #4ade80; border-bottom: 1px solid #444; padding-bottom: 10px; }
+        .btn { padding: 10px 20px; font-size: 16px; cursor: pointer; border: none; border-radius: 5px; font-weight: bold; margin-right: 10px; transition: 0.2s; }
+        .btn-start { background: #22c55e; color: white; }
+        .btn-end { background: #ef4444; color: white; }
+        .btn-action { background: #3b82f6; color: white; }
+        .btn:disabled { background: #555 !important; cursor: not-allowed; opacity: 0.5; }
+        input { padding: 10px; border-radius: 5px; border: 1px solid #444; background: #111; color: white; width: 150px; }
+        .flex { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
+        .log { background: #000; padding: 10px; border-radius: 5px; font-family: monospace; height: 200px; overflow-y: auto; color: #7afade; font-size: 13px; border: 1px solid #333; line-height: 1.6; }
+        .log-error { color: #ff4444; font-weight: bold; }
+        .log-success { color: #4ade80; }
+    </style>
+</head>
+<body>
+    <h1>🎡 RUST ROULETTE 管理パネル</h1>
+    
+    <div class="card">
+        <h2>1. 受付管理</h2>
+        <button class="btn btn-start" id="btnStart" onclick="doAction('BET START')">受付開始</button>
+        <button class="btn btn-end" id="btnEnd" onclick="doAction('BET END')">受付締切</button>
+    </div>
+
+    <div class="card">
+        <h2>2. 当選番号の確定</h2>
+        <div class="flex">
+            <input type="number" id="winNum" placeholder="当選番号 (1,3,5,10,20)">
+            <button class="btn btn-action" id="btnHaito" onclick="executeWin()">配当を配る</button>
+        </div>
+        <p id="haitoMsg" style="font-size: 12px; color: #aaa; margin-top: 5px;">※受付締切後のみ操作可能です</p>
+    </div>
+
+    <div class="card">
+        <h2>3. ポイント個別操作</h2>
+        <div class="flex">
+            <input type="text" id="targetUser" placeholder="ユーザー名" value="noppogi">
+            <input type="number" id="pointAmount" placeholder="枚数">
+            <button class="btn btn-action" onclick="sendPoints()">ポイントを送る</button>
+        </div>
+    </div>
+
+    <div id="adminLog" class="log">システムログ: 待機中...</div>
+
+    <script>
+        let ws;
+        // ★重要：Endpointを /streamerbot に合わせました
+        const wsUrl = "ws://127.0.0.1:8080/streamerbot";
+
+        function connect() {
+            ws = new WebSocket(wsUrl);
+            ws.onopen = () => log("★Streamer.botに接続成功", "success");
+            ws.onclose = () => { 
+                log("!! 接続が切れました。再接続中...", "error");
+                setTimeout(connect, 3000); 
+            };
+            ws.onerror = (err) => log("WebSocketエラーが発生しました", "error");
+        }
+        connect();
+
+        function log(msg, type = "") {
+            const el = document.getElementById('adminLog');
+            const div = document.createElement('div');
+            if (type === "error") div.className = "log-error";
+            if (type === "success") div.className = "log-success";
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            el.appendChild(div);
+            el.scrollTop = el.scrollHeight;
+        }
+
+        function doAction(actionName, extraArgs = {}) {
+            if (!ws || ws.readyState !== 1) {
+                log("エラー: 接続されていません", "error");
+                return;
+            }
+            ws.send(JSON.stringify({ "request": "DoAction", "action": { "name": actionName }, "args": extraArgs, "id": "PoggiAdmin" }));
+            log(actionName + " を送信しました");
+        }
+
+        function executeWin() {
+            const input = document.getElementById('winNum');
+            const num = input.value;
+            if(!num) return alert("当選番号を入力してください");
+            doAction("WIN_PAYOUT", { "winningNumber": num });
+            log(`✅ 当選番号 [${num}] で配当処理を開始しました`, "success");
+            input.value = ""; 
+        }
+
+        function sendPoints() {
+            const user = document.getElementById('targetUser').value.trim();
+            const amt = document.getElementById('pointAmount').value;
+            if(!user || !amt) return alert("ユーザー名と枚数を入れてね");
+            // C#側の引数名 pointValue に統一
+            doAction("GIVE_POINTS", { "targetUser": user, "pointValue": amt });
+            log(`${user} に ${amt} ポイント送付命令を送信`, "success");
+        }
+    </script>
+</body>
+</html>

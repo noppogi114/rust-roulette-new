@@ -1,0 +1,23 @@
+<script>
+    function setPoints(val) {
+        const el = document.getElementById('pts-display');
+        if (el) el.innerText = Number(val).toLocaleString() + " 枚";
+    }
+
+    function reloadPoints() {
+        const oldScript = document.getElementById('points-script');
+        if (oldScript) oldScript.remove();
+
+        const newScript = document.createElement('script');
+        newScript.id = 'points-script';
+        
+        // 【ここが重要】PC内のパスではなく、GitHubのURLを指定します
+        // 例: https://(ユーザー名).github.io/(リポジトリ名)/points.js
+        newScript.src = "https://noppogi.github.io/rust-roulette/points.js?v=" + Date.now();
+        
+        document.body.appendChild(newScript);
+    }
+
+    setInterval(reloadPoints, 500);
+    reloadPoints();
+</script>
