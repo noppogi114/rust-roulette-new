@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>POGGI RUST ROULETTE (v1.0.4 FINAL)</title>
+    <title>POGGI RUST ROULETTE (RE-CONNECT)</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
@@ -12,32 +12,29 @@
     </style>
 </head>
 <body>
-    <div id="debugInfo">WS: 待機中...</div>
+    <div id="debugInfo">WS: 切断中...</div>
     <div class="main-container">
         <div class="points-display" id="userPoints">0</div>
         <div class="status-display" id="betStatus">接続中...</div>
     </div>
     <script>
-        // ngrokのURL（https:// は含めない）
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
         let ws;
 
         function connect() {
-            // wss:// で接続（暗号化通信を強制）
-            ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
+            // ★あえて ws:// (暗号化なし) に戻します。これで ngrok の 501 エラーを回避します。
+            ws = new WebSocket("ws://" + NGROK_URL + "/streamerbot");
 
             ws.onopen = () => { 
                 console.log("★★★ WS CONNECTED ★★★"); 
-                document.getElementById('debugInfo').innerText = "ONLINE: 実況中";
-
-                // 1. サーバー側に「アクションの結果を受け取る」と購読申請（v1.0.4ルール）
+                document.getElementById('debugInfo').innerText = "ONLINE: 接続成功";
+                
+                // 1.0.4 用の命令
                 ws.send(JSON.stringify({
                     "request": "Subscribe",
                     "id": "POGGY_SUB",
                     "events": { "Raw": ["Action"] }
                 }));
-
-                // 2. ポイント取得アクションを実行
                 ws.send(JSON.stringify({
                     "request": "DoAction",
                     "id": "POGGY_INIT",
@@ -46,43 +43,29 @@
             };
 
             ws.onmessage = (event) => {
-                console.log("★生データ受信:", event.data);
+                console.log("信号受信:", event.data);
                 try {
                     const data = JSON.parse(event.data);
-
-                    // ポイント情報の反映
                     if (data.user_points !== undefined) {
                         document.getElementById('userPoints').innerText = Number(data.user_points).toLocaleString();
-                        // 最初の受信で「接続中」表示を「受付終了」に更新
                         if (document.getElementById('betStatus').innerText === "接続中...") {
                             document.getElementById('betStatus').innerText = "受付終了";
                         }
-                        console.log("✅ ポイント反映:", data.user_points);
                     }
-
-                    // 受付ステータスの反映
                     if (data.is_open !== undefined) {
                         const el = document.getElementById('betStatus');
-                        const isOpen = (data.is_open === true || data.is_open === "true" || data.is_open === 1);
+                        const isOpen = (data.is_open === true || data.is_open === 1);
                         el.innerText = isOpen ? "受付開始" : "受付終了";
                         el.style.color = isOpen ? "#22c55e" : "#ef4444";
                     }
                 } catch (e) {
-                    console.warn("⚠️ JSON解析失敗:", event.data);
+                    console.log("生データ:", event.data);
                 }
             };
 
-            ws.onclose = () => { 
-                console.log("❌ WS CLOSED - Reconnecting...");
-                document.getElementById('debugInfo').innerText = "OFFLINE: 再接続中";
-                setTimeout(connect, 3000); 
-            };
-            
-            ws.onerror = (err) => {
-                console.error("🚨 WS ERROR:", err);
-            };
+            ws.onclose = () => { setTimeout(connect, 3000); };
+            ws.onerror = (e) => { console.error("WSエラー:", e); };
         }
-
         connect();
     </script>
 </body>
