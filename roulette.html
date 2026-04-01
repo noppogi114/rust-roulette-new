@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>POGGI RUST ROULETTE (HTTPS SYNC)</title>
+    <title>POGGI RUST ROULETTE (FINAL SYNC)</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
@@ -12,37 +12,38 @@
     </style>
 </head>
 <body>
-    <div id="debugInfo">WS: 通信路の構築中...</div>
+    <div id="debugInfo">WS: 待機中...</div>
     <div class="main-container">
         <div class="points-display" id="userPoints">0</div>
         <div class="status-display" id="betStatus">接続中...</div>
     </div>
     <script>
-        // ngrokのURL
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
         let ws;
 
         function connect() {
-            // ★【最重要】GitHubのHTTPS制限を回避するため wss:// を使用
+            // wss:// で接続
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
 
             ws.onopen = () => { 
-                console.log("★★★ 通信確立 (Secure) ★★★"); 
+                console.log("★★★ 通信確立 (Success) ★★★"); 
                 document.getElementById('debugInfo').innerText = "ONLINE: 開通";
                 
-                // サーバーへのアクション購読命令
+                // 購読申請
                 ws.send(JSON.stringify({
                     "request": "Subscribe",
                     "id": "POGGY_SUB",
                     "events": { "Raw": ["Action"] }
                 }));
 
-                // ポイント取得アクション実行
-                ws.send(JSON.stringify({
-                    "request": "DoAction",
-                    "id": "POGGY_INIT",
-                    "action": { "name": "SEND_USER_POINTS" }
-                }));
+                // 少しだけ待ってからポイント取得（ボットの準備待ち）
+                setTimeout(() => {
+                    ws.send(JSON.stringify({
+                        "request": "DoAction",
+                        "id": "POGGY_INIT",
+                        "action": { "name": "SEND_USER_POINTS" }
+                    }));
+                }, 500);
             };
 
             ws.onmessage = (event) => {
