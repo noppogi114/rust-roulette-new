@@ -4,10 +4,46 @@
     <meta charset="UTF-8">
     <title>POGGI RUST ROULETTE</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
-        .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
-        .u-n { position: absolute; top: 71.0%; left: 14.5%; width: 20%; color: #ffcc00; font-size: 1.8vw; font-weight: bold; }
-        .u-p { position: absolute; top: 76.5%; left: 14.5%; width: 20%; color: #ffffff; font-size: 2.3vw; font-weight: bold; }
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            width: 100%; 
+            height: 100%; 
+            background-color: #000; 
+            overflow: hidden; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+        }
+        .main-container { 
+            position: relative; 
+            width: 100vw; 
+            height: 100vh; 
+            background-image: url('main_bg.png'); 
+            background-size: 100% 100%; 
+            background-position: center; 
+            background-repeat: no-repeat; 
+        }
+        /* ユーザー名表示位置 */
+        .u-n { 
+            position: absolute; 
+            top: 71.0%; 
+            left: 14.5%; 
+            width: 20%; 
+            color: #ffcc00; 
+            font-size: 1.8vw; 
+            font-weight: bold; 
+        }
+        /* 所持ポイント表示位置 */
+        .u-p { 
+            position: absolute; 
+            top: 76.5%; 
+            left: 14.5%; 
+            width: 20%; 
+            color: #ffffff; 
+            font-size: 2.3vw; 
+            font-weight: bold; 
+        }
     </style>
 </head>
 <body>
@@ -15,25 +51,52 @@
         <div id="n" class="u-n">---</div>
         <div id="p" class="u-p">0</div>
     </div>
+
     <script>
+        // 1. WebSocket 接続先（ポギーさんの ngrok アドレス）
         const ws = new WebSocket("wss://sombre-ellison-overdelicately.ngrok-free.dev/streamerbot");
-        
+
         ws.onopen = () => { 
             console.log("CONNECTED");
-            // ボットにアクション実行を依頼
-            ws.send(JSON.stringify({ "request": "DoAction", "id": "init", "action": { "name": "SEND_USER_POINTS" } }));
+
+            // 2. 【重要】ボットからの放送(Broadcast)を受け取るための「購読」設定
+            // これを送らないと、ボットは数字を教えてくれません
+            ws.send(JSON.stringify({
+                "request": "Subscribe",
+                "id": "subscribe_all",
+                "events": {
+                    "General": ["Custom"]
+                }
+            }));
+
+            // 3. ポイント取得用のアクションを実行（現在は確実に動く SEND_TEST を指定）
+            // もしアクション名を戻したなら、ここを SEND_USER_POINTS に書き換えてください
+            ws.send(JSON.stringify({ 
+                "request": "DoAction", 
+                "id": "init_request", 
+                "action": { 
+                    "name": "SEND_TEST" 
+                } 
+            }));
         };
 
         ws.onmessage = (e) => {
-            const d = JSON.parse(e.data);
-            console.log("RECEIVED:", d);
+            const res = JSON.parse(e.data);
+            console.log("RECEIVED:", res);
             
-            // ボットの標準報告(status:ok)を無視し、生データ(p)が届いた時だけ処理
-            if (d.p !== undefined) {
-                document.getElementById('n').innerText = d.n;
-                document.getElementById('p').innerText = Number(d.p).toLocaleString();
+            // 4. WebSocket King で確認した "data" の中身をチェック
+            // 放送(Broadcast)経由で届いた p と n を画面に反映させます
+            if (res.data && res.data.p !== undefined) {
+                // 名前をセット
+                document.getElementById('n').innerText = res.data.n;
+                // ポイントをセット（カンマ区切りに変換）
+                document.getElementById('p').innerText = Number(res.data.p).toLocaleString();
             }
         };
+
+        // エラーハンドリング（デバッグ用）
+        ws.onerror = (err) => console.error("WS ERROR:", err);
+        ws.onclose = () => console.log("DISCONNECTED");
     </script>
 </body>
 </html>
