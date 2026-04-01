@@ -14,5 +14,5 @@ echo --- GitHubへの送信処理を開始します ---
 %GIT_EXE% commit -m "Auto Update %date% %time%"
 %GIT_EXE% push origin main
 
-echo --- 処理が終了しました。窓を閉じるにはキーを押してください ---
-pause
+echo --- 処理が終了しました ---
+exit
