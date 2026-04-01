@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>POGGI RUST ROULETTE FINAL</title>
+    <title>POGGI RUST ROULETTE</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
@@ -13,9 +13,9 @@
 </head>
 <body>
     <div class="main-container">
-        <div id="userNameDisplay" class="user-name-display">---</div>
-        <div id="userPoints" class="points-display">0</div>
-        <div id="betStatus" class="status-display">接続中...</div>
+        <div id="u_name" class="user-name-display">---</div>
+        <div id="u_points" class="points-display">0</div>
+        <div id="u_status" class="status-display">接続中...</div>
     </div>
     <script>
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
@@ -24,7 +24,7 @@
         function connect() {
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
             ws.onopen = () => { 
-                console.log("★★★ WS CONNECT SUCCESS ★★★");
+                console.log("★ 接続完了 ★");
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "P_SUB", "events": { "Raw": ["Action"] } }));
                 setTimeout(() => {
                     ws.send(JSON.stringify({ "request": "DoAction", "id": "P_INIT", "action": { "name": "SEND_USER_POINTS" } }));
@@ -33,12 +33,14 @@
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                // ボットの定型報告ではなく、中身(user_points)がある時だけ画面を更新する
-                if (data.user_points !== undefined) {
-                    console.log("🔥 ポイントデータ受信完了:", data);
-                    if (data.user_name) document.getElementById('userNameDisplay').innerText = data.user_name;
-                    document.getElementById('userPoints').innerText = Number(data.user_points).toLocaleString();
-                    document.getElementById('betStatus').innerText = "受付終了";
+                // 生データ（pointsが含まれているか）を厳格にチェック
+                if (data.points !== undefined) {
+                    console.log("🎯 生データ受信成功！", data);
+                    document.getElementById('u_name').innerText = data.name;
+                    document.getElementById('u_points').innerText = Number(data.points).toLocaleString();
+                    document.getElementById('u_status').innerText = "受付終了";
+                } else {
+                    console.log("無視:", data);
                 }
             };
             ws.onclose = () => { setTimeout(connect, 3000); };
