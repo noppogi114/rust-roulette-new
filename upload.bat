@@ -1,14 +1,14 @@
 @echo off
-:: パスを現在のフォルダ名に合わせて修正しました
-cd /d "G:\動画キャプチャー\動画編集\RUST\rust-roulette-new"
+:: PCの「本物の住所」に合わせます（-newなし）
+cd /d "G:\動画キャプチャー\動画編集\RUST\rust-roulette"
 
-:: 全ての変更をステージング
+:: 変更をすべて記録（add . に変更）
 git add .
 
-:: 自動コミット
-git commit -m "Auto Update %date% %time%"
+:: 記録を確定（コミット）
+git commit -m "Auto Update"
 
-:: 強制的にメインブランチへ送信（Push）
+:: ネットへ送信（プッシュ）
 git push origin main
 
 exit
