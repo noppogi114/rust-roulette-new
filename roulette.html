@@ -8,16 +8,10 @@
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
         .u-p { position: absolute; top: 76.5%; left: 14.5%; width: 20%; color: #ffffff; font-size: 2.3vw; font-weight: bold; pointer-events: none; }
         .s-t { position: absolute; top: 91.5%; left: 58.5%; color: #ff0000; font-size: 1.8vw; font-weight: bold; pointer-events: none; }
-
-        /* 番号選択：位置をカードに合わせるため調整 */
         .number-selector { position: absolute; top: 21%; left: 8.5%; width: 83%; height: 35%; display: flex; justify-content: space-between; align-items: center; z-index: 100; }
-        /* テスト用に背景色をつけています。位置が合ったら background: transparent にしてください */
-        .num-div { width: 18%; height: 90%; cursor: pointer; border-radius: 15px; transition: 0.2s; position: relative; background: rgba(255, 0, 0, 0.2); }
+        .num-div { width: 18%; height: 90%; cursor: pointer; border-radius: 15px; transition: 0.2s; position: relative; }
         .num-div.selected { background: rgba(255, 255, 255, 0.4); box-shadow: 0 0 25px 10px #ffffff; border: 2px solid #ffffff; }
-        
-        /* BETボタン：位置を画像に合わせる */
-        .final-bet-div { position: absolute; top: 56%; left: 44.5%; width: 11%; height: 24%; cursor: pointer; z-index: 110; background: rgba(255, 0, 0, 0.3); }
-        
+        .final-bet-div { position: absolute; top: 56%; left: 44.5%; width: 11%; height: 24%; cursor: pointer; z-index: 110; }
         .input-amount { position: absolute; top: 62.5%; left: 5.0%; width: 24.0%; height: 4.5%; background: transparent; border: none; outline: none; color: #ffffff; font-size: 2.5vw; text-align: right; padding-right: 5%; font-weight: bold; z-index: 110; }
         .bet-label { position: absolute; bottom: 10px; left: 0; width: 100%; text-align: center; color: #fff; font-size: 1.2vw; font-weight: bold; text-shadow: 2px 2px 2px #000; pointer-events: none; }
         #betPopup { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.95); padding: 20px 40px; border-radius: 15px; font-size: 2.8vw; font-weight: bold; z-index: 999; display: none; text-shadow: 2px 2px 4px #000; border: 4px solid #ffd700; color: #ffd700; }
@@ -43,9 +37,8 @@
         let selectedNum = "", isBettingOpen = false, popupTimer = null, betRecords = {};
 
         ws.onopen = () => { 
-            console.log("WS CONNECTED");
-            ws.send(JSON.stringify({ "request": "Subscribe", "id": "sub", "events": { "General": ["Custom"] } }));
-            ws.send(JSON.stringify({ "request": "DoAction", "id": "init", "action": { "name": "SEND_USER_POINTS" } }));
+            ws.send(JSON.stringify({ "request": "Subscribe", "id": "sub_all", "events": { "General": ["Custom"] } }));
+            ws.send(JSON.stringify({ "request": "DoAction", "id": "init_req", "action": { "name": "SEND_USER_POINTS" } }));
         };
 
         ws.onmessage = (e) => {
@@ -64,24 +57,29 @@
 
         function selectNumber(num, element) {
             if(!isBettingOpen) return;
-            console.log("NUM SELECTED:", num);
             selectedNum = num;
             document.querySelectorAll('.num-div').forEach(d => d.classList.remove('selected'));
             element.classList.add('selected');
         }
 
         function executeBet() {
-            console.log("BET CLICKED! Open:", isBettingOpen, "Target:", selectedNum);
             if(!isBettingOpen || !selectedNum) return;
             const amount = parseInt(document.getElementById('betAmount').value);
             const currentTotal = parseInt(document.getElementById('p').innerText.replace(/,/g, ""));
             if (amount > currentTotal) { showPopup("ポイント不足", 2000); return; }
 
-            ws.send(JSON.stringify({
+            // 【修正箇所】id を追加し、Streamer.bot 1.0.4 の厳格な形式に合わせました
+            const betData = {
                 "request": "DoAction",
+                "id": "bet_request_" + Date.now(), 
                 "action": { "name": "BET KAKE" },
-                "args": { "betTarget": String(selectedNum), "betAmount": String(amount) }
-            }));
+                "args": { 
+                    "betTarget": String(selectedNum), 
+                    "betAmount": String(amount) 
+                }
+            };
+            
+            ws.send(JSON.stringify(betData));
 
             let msg = selectedNum + "番に " + amount + " 賭けました";
             if (betRecords[selectedNum]) msg = selectedNum + "番を " + amount + " に上書きしました";
