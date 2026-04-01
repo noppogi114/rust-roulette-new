@@ -2,52 +2,31 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>POGGI RUST ROULETTE (FINAL SYNC)</title>
+    <title>POGGI RUST ROULETTE (HYPER SYNC)</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
-        .number-selector { position: absolute; top: 22.2%; left: 15.5%; width: 69.0%; height: 32.0%; display: flex; justify-content: space-between; align-items: center; z-index: 100; }
-        .num-div { width: 16%; height: 95%; cursor: pointer; border-radius: 15px; transition: 0.2s; }
-        .num-div.selected { background: rgba(255, 255, 255, 0.4); box-shadow: 0 0 25px 10px #ffffff; border: 2px solid #ffffff; }
-        .final-bet-div { position: absolute; top: 55.5%; left: 44.5%; width: 11.5%; height: 25.0%; cursor: pointer; z-index: 110; }
-        .input-amount { position: absolute; top: 62.5%; left: 5%; width: 24.0%; height: 4.5%; background: transparent; border: none; outline: none; color: #ffffff; font-size: 2.5vw; text-align: right; padding-right: 5%; font-weight: bold; z-index: 110; }
         .points-display { position: absolute; top: 76.5%; left: 14.5%; width: 20%; height: 6%; display: flex; align-items: center; color: #ffffff; font-size: 2.3vw; font-weight: bold; }
         .status-display { position: absolute; top: 91.0%; left: 51.0%; width: 30%; height: 6%; display: flex; align-items: center; color: #ef4444; font-size: 2.2vw; font-weight: bold; text-shadow: 2px 2px 4px #000; }
-        #betPopup { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.95); padding: 20px 40px; border-radius: 15px; font-size: 2.8vw; font-weight: bold; z-index: 999; display: none; text-shadow: 2px 2px 4px #000; white-space: nowrap; pointer-events: none; border: 4px solid #ffd700; color: #ffd700; }
-        .pop-win { color: #fff100 !important; border-color: #fff100 !important; box-shadow: 0 0 60px #ffcc00 !important; }
-        .pop-lose { color: #ff4444 !important; border-color: #ff4444 !important; }
         #debugInfo { position: absolute; top: 10px; left: 10px; color: lime; font-family: monospace; font-size: 14px; background: rgba(0,0,0,0.8); padding: 5px; z-index: 9999; border: 1px solid lime; }
     </style>
 </head>
 <body>
     <div id="debugInfo">WS: 待機中...</div>
     <div class="main-container">
-        <div class="number-selector">
-            <div class="num-div" onclick="selectNumber('1', this)"></div>
-            <div class="num-div" onclick="selectNumber('3', this)"></div>
-            <div class="num-div" onclick="selectNumber('5', this)"></div>
-            <div class="num-div" onclick="selectNumber('10', this)"></div>
-            <div class="num-div" onclick="selectNumber('20', this)"></div>
-        </div>
-        <div class="final-bet-div" onclick="executeBet()"></div>
-        <input type="number" class="input-amount" id="betAmount" value="100">
         <div class="points-display" id="userPoints">0</div>
         <div class="status-display" id="betStatus">接続中...</div>
-        <div id="betPopup"></div>
     </div>
     <script>
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
         let ws;
-        let selectedNum = "";
-        let isBettingOpen = false;
-        let popupTimer = null;
 
         function connect() {
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
             ws.onopen = () => { 
                 console.log("★★★ WS CONNECTED ★★★"); 
                 document.getElementById('debugInfo').innerText = "ONLINE: 実況中";
-                // v1.0.4 用の初回ポイント取得命令
+                // v1.0.4形式でポイント取得命令を送信
                 ws.send(JSON.stringify({ "request": "DoAction", "action": "SEND_USER_POINTS", "id": "POGGY_INIT" }));
             };
 
@@ -55,78 +34,28 @@
                 console.log("信号受信:", event.data);
                 try {
                     const data = JSON.parse(event.data);
-                    
-                    // 1. ポイント反映
+                    // ポイント反映
                     if (data.user_points !== undefined) {
                         document.getElementById('userPoints').innerText = Number(data.user_points).toLocaleString();
-                    }
-
-                    // 2. 受付ステータス反映
-                    if (data.is_open !== undefined) {
-                        const el = document.getElementById('betStatus');
-                        isBettingOpen = (data.is_open === true || data.is_open === "true" || data.is_open === 1);
-                        if (isBettingOpen) {
-                            el.innerText = "受付開始";
-                            el.style.color = "#22c55e";
-                            document.querySelectorAll('.num-div').forEach(d => d.classList.remove('selected'));
-                            selectedNum = "";
-                        } else {
-                            el.innerText = "受付終了";
-                            el.style.color = "#ef4444";
+                        // ポイントが届いたら「接続中」を一旦「受付終了」にする
+                        if (document.getElementById('betStatus').innerText === "接続中...") {
+                            document.getElementById('betStatus').innerText = "受付終了";
                         }
                     }
-
-                    // 3. 当選ポップアップ
-                    if (data.poggi_msg !== undefined) {
-                        const isWin = data.poggi_msg.includes("当選");
-                        showPopup(data.poggi_msg, isWin ? "pop-win" : "pop-lose", 6000);
-                    }
-                } catch (e) {
-                    // JSONじゃないBroadcastJsonの生データもここで拾えるようにする
-                    if (event.data.includes("is_open")) {
-                        const isOpen = event.data.includes("true");
+                    // ステータス反映
+                    if (data.is_open !== undefined) {
                         const el = document.getElementById('betStatus');
-                        isBettingOpen = isOpen;
+                        const isOpen = (data.is_open === true || data.is_open === 1);
                         el.innerText = isOpen ? "受付開始" : "受付終了";
                         el.style.color = isOpen ? "#22c55e" : "#ef4444";
                     }
+                } catch (e) {
+                    console.log("生データ受信:", event.data);
                 }
             };
             ws.onclose = () => { setTimeout(connect, 3000); };
         }
         connect();
-
-        function selectNumber(num, element) {
-            if(!isBettingOpen) return;
-            selectedNum = num;
-            document.querySelectorAll('.num-div').forEach(d => d.classList.remove('selected'));
-            element.classList.add('selected');
-        }
-
-        function showPopup(text, className, duration) {
-            const p = document.getElementById('betPopup');
-            if(popupTimer) clearTimeout(popupTimer);
-            p.innerText = text;
-            p.className = className;
-            p.style.display = 'block';
-            popupTimer = setTimeout(() => { p.style.display = 'none'; }, duration);
-        }
-
-        function executeBet() {
-            const amount = parseInt(document.getElementById('betAmount').value);
-            const currentTotal = parseInt(document.getElementById('userPoints').innerText.replace(/,/g, ""));
-            if(!isBettingOpen || !selectedNum) return;
-            if (amount > currentTotal) { alert("ポイント不足"); return; }
-            if(ws && ws.readyState === 1) {
-                ws.send(JSON.stringify({
-                    "request": "DoAction",
-                    "action": "BET KAKE",
-                    "args": { "betTarget": String(selectedNum), "betAmount": String(amount) },
-                    "id": "POGGY_BET"
-                }));
-                showPopup(selectedNum + "番に賭けました", "", 3000);
-            }
-        }
     </script>
 </body>
 </html>
