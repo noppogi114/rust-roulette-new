@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>POGGI RUST ROULETTE (HYPER SYNC)</title>
+    <title>POGGI RUST ROULETTE (1.0.4 SYNC)</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
@@ -26,31 +26,38 @@
             ws.onopen = () => { 
                 console.log("★★★ WS CONNECTED ★★★"); 
                 document.getElementById('debugInfo').innerText = "ONLINE: 実況中";
-                // v1.0.4形式でポイント取得命令を送信
-                ws.send(JSON.stringify({ "request": "DoAction", "action": "SEND_USER_POINTS", "id": "POGGY_INIT" }));
+                
+                // 【超重要】1.0.4が「正解」と認める書き方に修正
+                ws.send(JSON.stringify({
+                    "request": "DoAction",
+                    "id": "POGGY_INIT",
+                    "action": { "name": "SEND_USER_POINTS" }
+                }));
             };
 
             ws.onmessage = (event) => {
                 console.log("信号受信:", event.data);
                 try {
                     const data = JSON.parse(event.data);
+                    
                     // ポイント反映
                     if (data.user_points !== undefined) {
                         document.getElementById('userPoints').innerText = Number(data.user_points).toLocaleString();
-                        // ポイントが届いたら「接続中」を一旦「受付終了」にする
+                        // 受付終了に切り替え（接続完了の合図）
                         if (document.getElementById('betStatus').innerText === "接続中...") {
                             document.getElementById('betStatus').innerText = "受付終了";
                         }
                     }
+
                     // ステータス反映
                     if (data.is_open !== undefined) {
                         const el = document.getElementById('betStatus');
-                        const isOpen = (data.is_open === true || data.is_open === 1);
+                        const isOpen = (data.is_open === true || data.is_open === "true" || data.is_open === 1);
                         el.innerText = isOpen ? "受付開始" : "受付終了";
                         el.style.color = isOpen ? "#22c55e" : "#ef4444";
                     }
                 } catch (e) {
-                    console.log("生データ受信:", event.data);
+                    console.log("生データ解析成功:", event.data);
                 }
             };
             ws.onclose = () => { setTimeout(connect, 3000); };
