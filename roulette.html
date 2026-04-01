@@ -38,23 +38,22 @@
 
         ws.onopen = () => { 
             ws.send(JSON.stringify({ "request": "Subscribe", "id": "sub", "events": { "General": ["Custom"] } }));
-            ws.send(JSON.stringify({ "request": "DoAction", "action": { "name": "SEND_TEST" } }));
+            // 【重要】本来の名前 SEND_USER_POINTS に戻しました
+            ws.send(JSON.stringify({ "request": "DoAction", "id": "init", "action": { "name": "SEND_USER_POINTS" } }));
         };
 
         ws.onmessage = (e) => {
             const res = JSON.parse(e.data);
-            if (res.data) {
-                const d = res.data;
-                if (d.p !== undefined) document.getElementById('p').innerText = Number(d.p).toLocaleString();
-                if (d.is_open !== undefined) {
-                    isBettingOpen = (d.is_open === true || d.is_open === 1);
-                    const statusEl = document.getElementById('status-text');
-                    statusEl.innerText = isBettingOpen ? "受付中" : "受付終了";
-                    statusEl.style.color = isBettingOpen ? "#00ff00" : "#ff0000";
-                    if (!isBettingOpen) resetBets();
-                }
-                if (d.poggi_msg !== undefined) showPopup(d.poggi_msg, 6000);
+            const d = res.data || res; // 予備の受信パターン
+            if (d.p !== undefined) document.getElementById('p').innerText = Number(d.p).toLocaleString();
+            if (d.is_open !== undefined) {
+                isBettingOpen = (d.is_open === true || d.is_open === 1);
+                const statusEl = document.getElementById('status-text');
+                statusEl.innerText = isBettingOpen ? "受付中" : "受付終了";
+                statusEl.style.color = isBettingOpen ? "#00ff00" : "#ff0000";
+                if (!isBettingOpen) resetBets();
             }
+            if (d.poggi_msg !== undefined) showPopup(d.poggi_msg, 6000);
         };
 
         function selectNumber(num, element) {
