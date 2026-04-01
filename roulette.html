@@ -13,8 +13,8 @@
         /* 所持ポイント */
         .u-p { position: absolute; top: 76.5%; left: 14.5%; width: 20%; color: #ffffff; font-size: 2.3vw; font-weight: bold; }
 
-        /* ステータス（右下） */
-        .s-t { position: absolute; top: 91.5%; left: 58.5%; color: #ffffff; font-size: 1.8vw; font-weight: bold; }
+        /* ステータス（右下）初期状態は赤 */
+        .s-t { position: absolute; top: 91.5%; left: 58.5%; color: #ff0000; font-size: 1.8vw; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -34,7 +34,6 @@
                 "id": "subscribe_all",
                 "events": { "General": ["Custom"] }
             }));
-            // 初期状態取得
             ws.send(JSON.stringify({ "request": "DoAction", "id": "init", "action": { "name": "SEND_TEST" } }));
         };
 
@@ -47,7 +46,7 @@
                     document.getElementById('p').innerText = Number(res.data.p).toLocaleString();
                 }
 
-                // 受付ステータス反映 (is_open という名前でボットから送る必要があります)
+                // ステータス反映
                 if (res.data.is_open !== undefined) {
                     const statusEl = document.getElementById('status-text');
                     if (res.data.is_open === true || res.data.is_open === 1) {
@@ -55,7 +54,7 @@
                         statusEl.style.color = "#00ff00"; // 受付中は緑
                     } else {
                         statusEl.innerText = "受付終了";
-                        statusEl.style.color = "#ffffff"; // 終了は白
+                        statusEl.style.color = "#ff0000"; // 受付終了は赤
                     }
                 }
             }
