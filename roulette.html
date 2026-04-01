@@ -24,7 +24,7 @@
         function connect() {
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
             ws.onopen = () => { 
-                console.log("★ 接続完了 ★");
+                console.log("★ CONNECTED ★");
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "P_SUB", "events": { "Raw": ["Action"] } }));
                 setTimeout(() => {
                     ws.send(JSON.stringify({ "request": "DoAction", "id": "P_INIT", "action": { "name": "SEND_USER_POINTS" } }));
@@ -32,15 +32,17 @@
             };
 
             ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                // 生データ（pointsが含まれているか）を厳格にチェック
-                if (data.points !== undefined) {
-                    console.log("🎯 生データ受信成功！", data);
-                    document.getElementById('u_name').innerText = data.name;
-                    document.getElementById('u_points').innerText = Number(data.points).toLocaleString();
+                const response = JSON.parse(event.data);
+                console.log("REC:", response);
+
+                // ボットの標準レスポンス(status:ok)の中にある引数(arguments)を探す
+                const data = response.data ? response.data.arguments : null;
+                
+                if (data && data.u_points !== undefined) {
+                    console.log("✅ 数字発見！:", data.u_points);
+                    document.getElementById('u_name').innerText = data.u_name;
+                    document.getElementById('u_points').innerText = Number(data.u_points).toLocaleString();
                     document.getElementById('u_status').innerText = "受付終了";
-                } else {
-                    console.log("無視:", data);
                 }
             };
             ws.onclose = () => { setTimeout(connect, 3000); };
