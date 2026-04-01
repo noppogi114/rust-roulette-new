@@ -1,23 +1,18 @@
 @echo off
-:: 1. フォルダ移動（ポギーさんのPCの実在パス）
+setlocal
+
+:: 1. GitHub Desktopが持っている「git.exe」の場所を直接指定します
+set GIT_PATH=%LOCALAPPDATA%\GitHubDesktop\bin\git.exe
+
+:: 2. フォルダ移動
 cd /d "G:\動画キャプチャー\動画編集\RUST\rust-roulette"
 
-:: 2. Gitの初期設定（念のため毎回通します）
-git config user.name "noppogi114"
-git config user.email "noppogi114@example.com"
+:: 3. 実行（Gitの場所を直接叩きます）
+echo --- 自動更新を開始します ---
 
-:: 3. 変更をすべて追加
-git add .
+"%GIT_PATH%" add .
+"%GIT_PATH%" commit -m "Auto Update %date% %time%"
+"%GIT_PATH%" push origin main
 
-:: 4. 記録（コミット） ※エラー回避のため空打ちを許容
-git commit -m "Auto Update %date% %time%"
-
-:: 5. ネットへ送信（プッシュ）
-echo GitHubに送信中...
-git push origin main
-
-:: 6. 結果を確認するために一時停止（成功したら exit に戻します）
-echo.
-echo ---- 処理終了 ----
-echo エラーが出ていなければ成功です。
+echo --- 処理終了 ---
 pause
