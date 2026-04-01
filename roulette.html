@@ -6,30 +6,28 @@
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
+        /* ユーザー名の表示位置（仮：所持ポイントの少し上） */
+        .user-name-display { position: absolute; top: 71.0%; left: 14.5%; width: 20%; height: 5%; display: flex; align-items: center; color: #ffcc00; font-size: 1.8vw; font-weight: bold; }
         /* 所持ポイントの表示位置 */
         .points-display { position: absolute; top: 76.5%; left: 14.5%; width: 20%; height: 6%; display: flex; align-items: center; color: #ffffff; font-size: 2.3vw; font-weight: bold; }
-        /* ステータス（接続中/受付終了）の表示位置 */
         .status-display { position: absolute; top: 91.0%; left: 51.0%; width: 30%; height: 6%; display: flex; align-items: center; color: #ef4444; font-size: 2.2vw; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="main-container">
+        <div class="user-name-display" id="userNameDisplay">---</div>
         <div class="points-display" id="userPoints">0</div>
         <div class="status-display" id="betStatus">接続中...</div>
     </div>
     <script>
-        // ngrokのURL（最新のもの）
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
         let ws;
 
         function connect() {
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
-            
             ws.onopen = () => { 
                 console.log("★★★ WS CONNECT SUCCESS ★★★");
-                // 1. サーバーのイベントを購読
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "P_SUB", "events": { "Raw": ["Action"] } }));
-                // 2. 0.5秒後に、現在のポイントを要求するアクションを実行
                 setTimeout(() => {
                     ws.send(JSON.stringify({ "request": "DoAction", "id": "P_INIT", "action": { "name": "SEND_USER_POINTS" } }));
                 }, 500);
@@ -37,35 +35,20 @@
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                console.log("WS: RECEIVED DATA ->", data);
+                console.log("WS: RECEIVED ->", data);
                 
-                let p = null;
-                // C#から直接送られた user_points を優先的に探す
-                if (data.user_points !== undefined) {
-                    p = data.user_points;
-                } 
-                // もしボット標準の arguments の中にあればそれを使う
-                else if (data.data && data.data.arguments && data.data.arguments.user_points !== undefined) {
-                    p = data.data.arguments.user_points;
+                // 名前の反映
+                if (data.user_name) {
+                    document.getElementById('userNameDisplay').innerText = data.user_name;
                 }
-
-                if (p !== null) {
-                    // 数字をカンマ区切りで画面に反映
-                    document.getElementById('userPoints').innerText = Number(p).toLocaleString();
+                // ポイントの反映
+                if (data.user_points !== undefined) {
+                    document.getElementById('userPoints').innerText = Number(data.user_points).toLocaleString();
                     document.getElementById('betStatus').innerText = "受付終了";
                 }
             };
-
-            ws.onclose = () => { 
-                console.log("WS: CLOSED. RECONNECTING...");
-                setTimeout(connect, 3000); 
-            };
-            
-            ws.onerror = (err) => {
-                console.error("WS: ERROR", err);
-            };
+            ws.onclose = () => { setTimeout(connect, 3000); };
         }
-
         connect();
     </script>
 </body>
