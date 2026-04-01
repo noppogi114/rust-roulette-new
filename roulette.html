@@ -24,8 +24,9 @@
             background-position: center; 
             background-repeat: no-repeat; 
         }
-        /* ユーザー名表示位置 */
+        /* ユーザー名表示位置（display: none で非表示に設定） */
         .u-n { 
+            display: none; /* ← ここを追加しました */
             position: absolute; 
             top: 71.0%; 
             left: 14.5%; 
@@ -53,50 +54,29 @@
     </div>
 
     <script>
-        // 1. WebSocket 接続先（ポギーさんの ngrok アドレス）
         const ws = new WebSocket("wss://sombre-ellison-overdelicately.ngrok-free.dev/streamerbot");
 
         ws.onopen = () => { 
             console.log("CONNECTED");
-
-            // 2. 【重要】ボットからの放送(Broadcast)を受け取るための「購読」設定
-            // これを送らないと、ボットは数字を教えてくれません
             ws.send(JSON.stringify({
                 "request": "Subscribe",
                 "id": "subscribe_all",
-                "events": {
-                    "General": ["Custom"]
-                }
+                "events": { "General": ["Custom"] }
             }));
-
-            // 3. ポイント取得用のアクションを実行（現在は確実に動く SEND_TEST を指定）
-            // もしアクション名を戻したなら、ここを SEND_USER_POINTS に書き換えてください
             ws.send(JSON.stringify({ 
                 "request": "DoAction", 
                 "id": "init_request", 
-                "action": { 
-                    "name": "SEND_TEST" 
-                } 
+                "action": { "name": "SEND_TEST" } 
             }));
         };
 
         ws.onmessage = (e) => {
             const res = JSON.parse(e.data);
-            console.log("RECEIVED:", res);
-            
-            // 4. WebSocket King で確認した "data" の中身をチェック
-            // 放送(Broadcast)経由で届いた p と n を画面に反映させます
             if (res.data && res.data.p !== undefined) {
-                // 名前をセット
                 document.getElementById('n').innerText = res.data.n;
-                // ポイントをセット（カンマ区切りに変換）
                 document.getElementById('p').innerText = Number(res.data.p).toLocaleString();
             }
         };
-
-        // エラーハンドリング（デバッグ用）
-        ws.onerror = (err) => console.error("WS ERROR:", err);
-        ws.onclose = () => console.log("DISCONNECTED");
     </script>
 </body>
 </html>
