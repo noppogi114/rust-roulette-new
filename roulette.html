@@ -49,12 +49,26 @@
         let popupTimer = null;
 
         function connect() {
-            // リスナー用なので、ポギーさんのPC（ngrok）の /streamerbot 窓口へ接続
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
             ws.onopen = () => { 
                 console.log("WS Connected"); 
                 document.getElementById('debugInfo').innerText = "ONLINE: 接続成功";
             };
+
+            // 【追加】リアルタイムメッセージ受信
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    // SEND_USER_POINTS アクションから送られてくるポイント情報を反映
+                    if (data.user_points !== undefined) {
+                        document.getElementById('userPoints').innerText = Number(data.user_points).toLocaleString();
+                        console.log("WebSocket Point Sync:", data.user_points);
+                    }
+                } catch (e) {
+                    console.log("Message error:", e);
+                }
+            };
+
             ws.onclose = () => { 
                 document.getElementById('debugInfo').innerText = "OFFLINE: 再接続中...";
                 setTimeout(connect, 3000); 
@@ -112,10 +126,9 @@
         }
 
         // --- 物理監視（ポーリング）セクション ---
+        // WebSocketが切れた場合や初回読み込みのために残していますが、WSが優先されます
         function updateLoop() {
             const t = new Date().getTime();
-            
-            // ファイルパスは roulette.html と同じフォルダにある前提
             const files = [
                 { id: 'userPoints', file: 'points.txt', isPoint: true },
                 { id: 'betStatus', file: 'bet_status.txt', isStatus: true },
@@ -124,16 +137,17 @@
 
             files.forEach(item => {
                 const xhr = new XMLHttpRequest();
-                // リスナーはブラウザから直接ローカルファイルを見れないため、
-                // 公開場所（GitHub Pages等）にあるファイルを読みに行く
                 xhr.open("GET", item.file + "?v=" + t, true);
                 xhr.onreadystatechange = function() {
                     if (xhr.readyState === 4 && xhr.status === 200) {
                         const txt = xhr.responseText.trim();
                         
                         if (item.isPoint) {
-                            if(txt !== "" && !isNaN(txt.replace(/,/g, ""))) {
-                                document.getElementById('userPoints').innerText = Number(txt.replace(/,/g, "")).toLocaleString();
+                            // WebSocketが接続されていない時のみtxtを反映（二重更新防止）
+                            if(ws && ws.readyState !== 1) {
+                                if(txt !== "" && !isNaN(txt.replace(/,/g, ""))) {
+                                    document.getElementById('userPoints').innerText = Number(txt.replace(/,/g, "")).toLocaleString();
+                                }
                             }
                         } else if (item.isStatus) {
                             const el = document.getElementById('betStatus');
