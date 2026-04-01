@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>POGGI RUST ROULETTE (HYPER SYNC)</title>
+    <title>POGGI RUST ROULETTE (1.0.4 FINAL SYNC)</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
@@ -25,23 +25,11 @@
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
 
             ws.onopen = () => { 
-                console.log("★★★ 通信確立 ★★★"); 
+                console.log("★★★ WS CONNECTED ★★★"); 
                 document.getElementById('debugInfo').innerText = "ONLINE: 開通";
-                
-                // 購読申請（すべてのイベントを受け取る）
-                ws.send(JSON.stringify({
-                    "request": "Subscribe",
-                    "id": "POGGY_SUB",
-                    "events": { "Raw": ["Action"] }
-                }));
-
-                // ポイント取得アクション実行
+                ws.send(JSON.stringify({ "request": "Subscribe", "id": "POGGY_SUB", "events": { "Raw": ["Action"] } }));
                 setTimeout(() => {
-                    ws.send(JSON.stringify({
-                        "request": "DoAction",
-                        "id": "POGGY_INIT",
-                        "action": { "name": "SEND_USER_POINTS" }
-                    }));
+                    ws.send(JSON.stringify({ "request": "DoAction", "id": "POGGY_INIT", "action": { "name": "SEND_USER_POINTS" } }));
                 }, 500);
             };
 
@@ -50,41 +38,21 @@
                 try {
                     const data = JSON.parse(event.data);
                     
-                    // 1. ポイントの抽出 (階層が深くても、個別に送られてきても両対応)
-                    let points = null;
-                    
-                    // 個別BroadcastJsonで届いた場合
-                    if (data.user_points !== undefined) {
-                        points = data.user_points;
-                    } 
-                    // DoActionの戻り値(data.dataの中)に含まれている場合
-                    else if (data.data && data.data.user_points !== undefined) {
-                        points = data.data.user_points;
-                    }
+                    // 【解決策】データの中をくまなく探して数字を見つける
+                    let p = null;
+                    if (data.user_points !== undefined) p = data.user_points;
+                    else if (data.data && data.data.arguments && data.data.arguments.user_points !== undefined) p = data.data.arguments.user_points;
+                    else if (data.arguments && data.arguments.user_points !== undefined) p = data.arguments.user_points;
 
-                    // 数字が見つかったら即反映
-                    if (points !== null) {
-                        document.getElementById('userPoints').innerText = Number(points).toLocaleString();
-                        if (document.getElementById('betStatus').innerText === "接続中...") {
-                            document.getElementById('betStatus').innerText = "受付終了";
-                        }
-                        console.log("✅ 反映成功:", points);
+                    if (p !== null) {
+                        document.getElementById('userPoints').innerText = Number(p).toLocaleString();
+                        document.getElementById('betStatus').innerText = "受付終了";
+                        console.log("✅ ポイント反映成功:", p);
                     }
-
-                    // 2. ステータスの反映
-                    if (data.is_open !== undefined) {
-                        const el = document.getElementById('betStatus');
-                        const isOpen = (data.is_open === true || data.is_open === 1);
-                        el.innerText = isOpen ? "受付開始" : "受付終了";
-                        el.style.color = isOpen ? "#22c55e" : "#ef4444";
-                    }
-                } catch (e) {
-                    console.error("解析エラー:", e);
-                }
+                } catch (e) { console.error(e); }
             };
 
             ws.onclose = () => { setTimeout(connect, 3000); };
-            ws.onerror = (e) => { console.error("通信エラー:", e); };
         }
         connect();
     </script>
