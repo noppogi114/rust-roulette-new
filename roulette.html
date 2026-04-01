@@ -4,53 +4,24 @@
     <meta charset="UTF-8">
     <title>POGGI RUST ROULETTE</title>
     <style>
-        body, html { 
-            margin: 0; 
-            padding: 0; 
-            width: 100%; 
-            height: 100%; 
-            background-color: #000; 
-            overflow: hidden; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-        }
-        .main-container { 
-            position: relative; 
-            width: 100vw; 
-            height: 100vh; 
-            background-image: url('main_bg.png'); 
-            background-size: 100% 100%; 
-            background-position: center; 
-            background-repeat: no-repeat; 
-        }
-        /* ユーザー名表示位置（display: none で非表示に設定） */
-        .u-n { 
-            display: none; /* ← ここを追加しました */
-            position: absolute; 
-            top: 71.0%; 
-            left: 14.5%; 
-            width: 20%; 
-            color: #ffcc00; 
-            font-size: 1.8vw; 
-            font-weight: bold; 
-        }
-        /* 所持ポイント表示位置 */
-        .u-p { 
-            position: absolute; 
-            top: 76.5%; 
-            left: 14.5%; 
-            width: 20%; 
-            color: #ffffff; 
-            font-size: 2.3vw; 
-            font-weight: bold; 
-        }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
+        .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
+        
+        /* ユーザー名（非表示） */
+        .u-n { display: none; position: absolute; top: 71.0%; left: 14.5%; width: 20%; color: #ffcc00; font-size: 1.8vw; font-weight: bold; }
+        
+        /* 所持ポイント */
+        .u-p { position: absolute; top: 76.5%; left: 14.5%; width: 20%; color: #ffffff; font-size: 2.3vw; font-weight: bold; }
+
+        /* ステータス（右下） */
+        .s-t { position: absolute; top: 91.5%; left: 58.5%; color: #ffffff; font-size: 1.8vw; font-weight: bold; }
     </style>
 </head>
 <body>
     <div class="main-container">
         <div id="n" class="u-n">---</div>
         <div id="p" class="u-p">0</div>
+        <div id="status-text" class="s-t">受付終了</div>
     </div>
 
     <script>
@@ -63,18 +34,30 @@
                 "id": "subscribe_all",
                 "events": { "General": ["Custom"] }
             }));
-            ws.send(JSON.stringify({ 
-                "request": "DoAction", 
-                "id": "init_request", 
-                "action": { "name": "SEND_TEST" } 
-            }));
+            // 初期状態取得
+            ws.send(JSON.stringify({ "request": "DoAction", "id": "init", "action": { "name": "SEND_TEST" } }));
         };
 
         ws.onmessage = (e) => {
             const res = JSON.parse(e.data);
-            if (res.data && res.data.p !== undefined) {
-                document.getElementById('n').innerText = res.data.n;
-                document.getElementById('p').innerText = Number(res.data.p).toLocaleString();
+            
+            if (res.data) {
+                // ポイント反映
+                if (res.data.p !== undefined) {
+                    document.getElementById('p').innerText = Number(res.data.p).toLocaleString();
+                }
+
+                // 受付ステータス反映 (is_open という名前でボットから送る必要があります)
+                if (res.data.is_open !== undefined) {
+                    const statusEl = document.getElementById('status-text');
+                    if (res.data.is_open === true || res.data.is_open === 1) {
+                        statusEl.innerText = "受付中";
+                        statusEl.style.color = "#00ff00"; // 受付中は緑
+                    } else {
+                        statusEl.innerText = "受付終了";
+                        statusEl.style.color = "#ffffff"; // 終了は白
+                    }
+                }
             }
         };
     </script>
