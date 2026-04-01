@@ -11,7 +11,10 @@
         .btn-start { background: #22c55e; color: white; }
         .btn-end { background: #ef4444; color: white; }
         .btn-action { background: #3b82f6; color: white; }
+        /* 無効化時のスタイル */
         .btn:disabled { background: #555 !important; cursor: not-allowed; opacity: 0.5; }
+        input:disabled { background: #333 !important; color: #777 !important; cursor: not-allowed; }
+        
         input { padding: 10px; border-radius: 5px; border: 1px solid #444; background: #111; color: white; width: 150px; }
         .flex { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
         .log { background: #000; padding: 10px; border-radius: 5px; font-family: monospace; height: 200px; overflow-y: auto; color: #7afade; font-size: 13px; border: 1px solid #333; line-height: 1.6; }
@@ -31,10 +34,12 @@
     <div class="card">
         <h2>2. 当選番号の確定</h2>
         <div class="flex">
-            <input type="number" id="winNum" placeholder="当選番号 (1,3,5,10,20)">
-            <button class="btn btn-action" id="btnHaito" onclick="executeWin()">配当を配る</button>
+            <input type="number" id="winNum" placeholder="1, 3, 5, 10, 20" disabled>
+            <button class="btn btn-action" id="btnHaito" onclick="executeWin()" disabled>配当を配る</button>
         </div>
-        <p id="haitoMsg" style="font-size: 12px; color: #aaa; margin-top: 5px;">※受付締切後のみ操作可能です</p>
+        <p id="haitoStatusMsg" style="font-size: 12px; color: #ef4444; margin-top: 5px; font-weight: bold;">
+            【待機中】受付を締切ると入力可能になります
+        </p>
     </div>
 
     <div class="card">
@@ -50,19 +55,63 @@
 
     <script>
         let ws;
-        // ★重要：Endpointを /streamerbot に合わせました
         const wsUrl = "ws://127.0.0.1:8080/streamerbot";
+        const validNumbers = [1, 3, 5, 10, 20];
 
         function connect() {
             ws = new WebSocket(wsUrl);
-            ws.onopen = () => log("★Streamer.botに接続成功", "success");
+            ws.onopen = () => {
+                log("★Streamer.botに接続成功", "success");
+                // 現在の状態を購読
+                ws.send(JSON.stringify({ "request": "Subscribe", "id": "admin_sub", "events": { "General": ["Custom"] } }));
+                // 初期化：今の受付状態を確認するためにポイント送信アクションを流用（is_openを取得するため）
+                ws.send(JSON.stringify({ "request": "DoAction", "id": "init_check", "action": { "name": "SEND_USER_POINTS" } }));
+            };
+            
+            ws.onmessage = (event) => {
+                const res = JSON.parse(event.data);
+                const d = res.data || res;
+
+                // 受付状態(is_open)を監視してUIを切り替える
+                if (d.is_open !== undefined) {
+                    const isOpen = (d.is_open == 1 || d.is_open === true);
+                    updateUI(isOpen);
+                }
+            };
+
             ws.onclose = () => { 
                 log("!! 接続が切れました。再接続中...", "error");
                 setTimeout(connect, 3000); 
             };
-            ws.onerror = (err) => log("WebSocketエラーが発生しました", "error");
         }
         connect();
+
+        // 受付状態に合わせて入力可否を切り替える関数
+        function updateUI(isOpen) {
+            const winInput = document.getElementById('winNum');
+            const haitoBtn = document.getElementById('btnHaito');
+            const msg = document.getElementById('haitoStatusMsg');
+            const startBtn = document.getElementById('btnStart');
+            const endBtn = document.getElementById('btnEnd');
+
+            if (isOpen) {
+                // 受付中のとき
+                winInput.disabled = true;
+                haitoBtn.disabled = true;
+                startBtn.disabled = true;
+                endBtn.disabled = false;
+                msg.innerText = "【受付中】締切るまで当選番号は入力できません";
+                msg.style.color = "#aaa";
+            } else {
+                // 締切済のとき
+                winInput.disabled = false;
+                haitoBtn.disabled = false;
+                startBtn.disabled = false;
+                endBtn.disabled = true;
+                msg.innerText = "【受付締切済】当選番号を入力して配当を実行してください";
+                msg.style.color = "#4ade80";
+            }
+        }
 
         function log(msg, type = "") {
             const el = document.getElementById('adminLog');
@@ -79,15 +128,27 @@
                 log("エラー: 接続されていません", "error");
                 return;
             }
-            ws.send(JSON.stringify({ "request": "DoAction", "action": { "name": actionName }, "args": extraArgs, "id": "PoggiAdmin" }));
+            ws.send(JSON.stringify({ 
+                "request": "DoAction", 
+                "action": { "name": actionName }, 
+                "args": extraArgs, 
+                "id": "PoggiAdmin_" + Date.now() 
+            }));
             log(actionName + " を送信しました");
         }
 
         function executeWin() {
             const input = document.getElementById('winNum');
-            const num = input.value;
-            if(!num) return alert("当選番号を入力してください");
-            doAction("WIN_PAYOUT", { "winningNumber": num });
+            const num = parseInt(input.value);
+            
+            // ルールチェック：1,3,5,10,20以外は弾く
+            if (!validNumbers.includes(num)) {
+                alert("不正な番号です。1, 3, 5, 10, 20 のいずれかを入力してください。");
+                return;
+            }
+
+            // BET WINNER アクションに arg1 として番号を渡す
+            doAction("BET WINNER", { "arg1": String(num) });
             log(`✅ 当選番号 [${num}] で配当処理を開始しました`, "success");
             input.value = ""; 
         }
@@ -96,7 +157,6 @@
             const user = document.getElementById('targetUser').value.trim();
             const amt = document.getElementById('pointAmount').value;
             if(!user || !amt) return alert("ユーザー名と枚数を入れてね");
-            // C#側の引数名 pointValue に統一
             doAction("GIVE_POINTS", { "targetUser": user, "pointValue": amt });
             log(`${user} に ${amt} ポイント送付命令を送信`, "success");
         }
