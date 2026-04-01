@@ -6,41 +6,21 @@
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
-        
-        /* ユーザー名（非表示） */
-        .u-n { display: none; position: absolute; top: 71.0%; left: 14.5%; width: 20%; color: #ffcc00; font-size: 1.8vw; font-weight: bold; }
-        
-        /* 所持ポイント */
-        .u-p { position: absolute; top: 76.5%; left: 14.5%; width: 20%; color: #ffffff; font-size: 2.3vw; font-weight: bold; }
-
-        /* ステータス（右下） */
-        .s-t { position: absolute; top: 91.5%; left: 58.5%; color: #ff0000; font-size: 1.8vw; font-weight: bold; }
-
-        /* 番号選択エリア */
+        .u-p { position: absolute; top: 76.5%; left: 14.5%; width: 20%; color: #ffffff; font-size: 2.3vw; font-weight: bold; pointer-events: none; }
+        .s-t { position: absolute; top: 91.5%; left: 58.5%; color: #ff0000; font-size: 1.8vw; font-weight: bold; pointer-events: none; }
         .number-selector { position: absolute; top: 22.2%; left: 15.5%; width: 69.0%; height: 32.0%; display: flex; justify-content: space-between; align-items: center; z-index: 100; }
         .num-div { width: 16%; height: 95%; cursor: pointer; border-radius: 15px; transition: 0.2s; position: relative; }
         .num-div.selected { background: rgba(255, 255, 255, 0.4); box-shadow: 0 0 25px 10px #ffffff; border: 2px solid #ffffff; }
-        
-        /* BET実行ボタン */
         .final-bet-div { position: absolute; top: 55.5%; left: 44.5%; width: 11.5%; height: 25.0%; cursor: pointer; z-index: 110; }
-        
-        /* BET額入力欄 */
         .input-amount { position: absolute; top: 62.5%; left: 5.0%; width: 24.0%; height: 4.5%; background: transparent; border: none; outline: none; color: #ffffff; font-size: 2.5vw; text-align: right; padding-right: 5%; font-weight: bold; z-index: 110; }
-        
-        /* 番号ごとのBET額表示ラベル */
         .bet-label { position: absolute; bottom: -25px; left: 0; width: 100%; text-align: center; color: #fff; font-size: 1.2vw; font-weight: bold; text-shadow: 1px 1px 2px #000; pointer-events: none; }
-
-        /* ポップアップ通知 */
         #betPopup { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.95); padding: 20px 40px; border-radius: 15px; font-size: 2.8vw; font-weight: bold; z-index: 999; display: none; text-shadow: 2px 2px 4px #000; border: 4px solid #ffd700; color: #ffd700; }
-        .pop-win { color: #fff100 !important; border-color: #fff100 !important; box-shadow: 0 0 60px #ffcc00 !important; }
-        .pop-lose { color: #ff4444 !important; border-color: #ff4444 !important; }
     </style>
 </head>
 <body>
     <div class="main-container">
         <div id="p" class="u-p">0</div>
         <div id="status-text" class="s-t">受付終了</div>
-
         <div class="number-selector">
             <div class="num-div" onclick="selectNumber('1', this)"><div id="bet-1" class="bet-label"></div></div>
             <div class="num-div" onclick="selectNumber('3', this)"><div id="bet-3" class="bet-label"></div></div>
@@ -52,30 +32,20 @@
         <input type="number" class="input-amount" id="betAmount" value="100">
         <div id="betPopup"></div>
     </div>
-
     <script>
         const ws = new WebSocket("wss://sombre-ellison-overdelicately.ngrok-free.dev/streamerbot");
-        let selectedNum = "";
-        let isBettingOpen = false;
-        let popupTimer = null;
-        let betRecords = {}; // 番号ごとの賭け金を記録するオブジェクト
+        let selectedNum = "", isBettingOpen = false, popupTimer = null, betRecords = {};
 
         ws.onopen = () => { 
-            ws.send(JSON.stringify({
-                "request": "Subscribe",
-                "id": "sub",
-                "events": { "General": ["Custom"] }
-            }));
-            ws.send(JSON.stringify({ "request": "DoAction", "id": "init", "action": { "name": "SEND_TEST" } }));
+            ws.send(JSON.stringify({ "request": "Subscribe", "id": "sub", "events": { "General": ["Custom"] } }));
+            ws.send(JSON.stringify({ "request": "DoAction", "action": { "name": "SEND_TEST" } }));
         };
 
         ws.onmessage = (e) => {
             const res = JSON.parse(e.data);
             if (res.data) {
                 const d = res.data;
-                if (d.p !== undefined) {
-                    document.getElementById('p').innerText = Number(d.p).toLocaleString();
-                }
+                if (d.p !== undefined) document.getElementById('p').innerText = Number(d.p).toLocaleString();
                 if (d.is_open !== undefined) {
                     isBettingOpen = (d.is_open === true || d.is_open === 1);
                     const statusEl = document.getElementById('status-text');
@@ -83,9 +53,7 @@
                     statusEl.style.color = isBettingOpen ? "#00ff00" : "#ff0000";
                     if (!isBettingOpen) resetBets();
                 }
-                if (d.poggi_msg !== undefined) {
-                    showPopup(d.poggi_msg, d.poggi_msg.includes("当選") ? "pop-win" : "pop-lose", 6000);
-                }
+                if (d.poggi_msg !== undefined) showPopup(d.poggi_msg, 6000);
             }
         };
 
@@ -97,36 +65,22 @@
         }
 
         function executeBet() {
-            if(!isBettingOpen) { showPopup("受付終了しています", "pop-lose", 2000); return; }
-            if(!selectedNum) { showPopup("番号を選んでください", "", 2000); return; }
-
-            const amountStr = document.getElementById('betAmount').value;
-            const amount = parseInt(amountStr);
+            if(!isBettingOpen || !selectedNum) return;
+            const amount = parseInt(document.getElementById('betAmount').value);
             const currentTotal = parseInt(document.getElementById('p').innerText.replace(/,/g, ""));
-            
-            // 所持ポイントチェック
-            if (amount > currentTotal) {
-                showPopup("ポイント不足", "pop-lose", 2000);
-                return;
-            }
+            if (amount > currentTotal) { showPopup("ポイント不足", 2000); return; }
 
-            // ボットにBET命令を送信
             ws.send(JSON.stringify({
                 "request": "DoAction",
                 "action": { "name": "BET KAKE" },
                 "args": { "betTarget": String(selectedNum), "betAmount": String(amount) }
             }));
 
-            // ポップアップの文言判定（新規か上書きか）
             let msg = selectedNum + "番に " + amount + " 賭けました";
-            if (betRecords[selectedNum] !== undefined) {
-                msg = selectedNum + "番を " + amount + " に上書きしました";
-            }
-
-            // 記録を更新して画面表示
+            if (betRecords[selectedNum]) msg = selectedNum + "番を " + amount + " に上書きしました";
             betRecords[selectedNum] = amount;
             document.getElementById('bet-' + selectedNum).innerText = amount + " jobo";
-            showPopup(msg, "", 2500);
+            showPopup(msg, 2500);
         }
 
         function resetBets() {
@@ -136,12 +90,10 @@
             selectedNum = "";
         }
 
-        function showPopup(text, className, duration) {
+        function showPopup(text, duration) {
             const p = document.getElementById('betPopup');
             if(popupTimer) clearTimeout(popupTimer);
-            p.innerText = text;
-            p.className = "pop-default " + (className || "");
-            p.style.display = 'block';
+            p.innerText = text; p.style.display = 'block';
             popupTimer = setTimeout(() => { p.style.display = 'none'; }, duration);
         }
     </script>
