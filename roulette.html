@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>POGGI RUST ROULETTE (HYPER SYNC)</title>
+    <title>POGGI RUST ROULETTE (RE-SYNC)</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
@@ -46,43 +46,33 @@
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
             ws.onopen = () => { 
                 console.log("★★★ WS CONNECTED ★★★"); 
-                document.getElementById('debugInfo').innerText = "ONLINE: 接続中";
-                // 接続時にポイント取得アクションを実行
-                ws.send(JSON.stringify({ "request": "DoAction", "action": { "name": "SEND_USER_POINTS" } }));
+                document.getElementById('debugInfo').innerText = "ONLINE: 実況中";
+                ws.send(JSON.stringify({ "request": "DoAction", "action": "SEND_USER_POINTS", "id": "POGGY_INIT" }));
             };
             ws.onmessage = (event) => {
-                console.log("受信データ:", event.data);
+                console.log("信号受信:", event.data);
                 try {
                     const data = JSON.parse(event.data);
-                    
-                    // 1. ポイントの反映
+                    // 【修正】v1.0.4のBroadcastメッセージをキャッチ
                     if (data.user_points !== undefined) {
                         document.getElementById('userPoints').innerText = Number(data.user_points).toLocaleString();
                     }
-
-                    // 2. 受付ステータスの反映
                     if (data.is_open !== undefined) {
                         const el = document.getElementById('betStatus');
-                        isBettingOpen = data.is_open === true || data.is_open === "true" || data.is_open === 1;
+                        isBettingOpen = (data.is_open === true || data.is_open === "true" || data.is_open === 1);
                         if (isBettingOpen) {
-                            el.innerText = "受付開始";
-                            el.style.color = "#22c55e";
+                            el.innerText = "受付開始"; el.style.color = "#22c55e";
                             document.querySelectorAll('.num-div').forEach(d => d.classList.remove('selected'));
                             selectedNum = "";
                         } else {
-                            el.innerText = "受付終了";
-                            el.style.color = "#ef4444";
+                            el.innerText = "受付終了"; el.style.color = "#ef4444";
                         }
                     }
-
-                    // 3. メッセージ表示
                     if (data.poggi_msg !== undefined) {
                         const isWin = data.poggi_msg.includes("当選");
                         showPopup(data.poggi_msg, isWin ? "pop-win" : "pop-lose", 6000);
                     }
-                } catch (e) {
-                    console.log("JSON Parse Error:", e);
-                }
+                } catch (e) { console.log("信号エラー:", event.data); }
             };
             ws.onclose = () => { setTimeout(connect, 3000); };
         }
@@ -98,9 +88,7 @@
         function showPopup(text, className, duration) {
             const p = document.getElementById('betPopup');
             if(popupTimer) clearTimeout(popupTimer);
-            p.innerText = text;
-            p.className = className;
-            p.style.display = 'block';
+            p.innerText = text; p.className = className; p.style.display = 'block';
             popupTimer = setTimeout(() => { p.style.display = 'none'; }, duration);
         }
 
@@ -112,8 +100,9 @@
             if(ws && ws.readyState === 1) {
                 ws.send(JSON.stringify({
                     "request": "DoAction",
-                    "action": { "name": "BET KAKE" },
-                    "args": { "betTarget": String(selectedNum), "betAmount": String(amount) }
+                    "action": "BET KAKE",
+                    "args": { "betTarget": String(selectedNum), "betAmount": String(amount) },
+                    "id": "POGGY_BET"
                 }));
                 showPopup(selectedNum + "番に賭けました", "", 3000);
             }
