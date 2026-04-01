@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>POGGI RUST ROULETTE (FINAL WSS)</title>
+    <title>POGGI RUST ROULETTE (HTTPS SYNC)</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
@@ -12,30 +12,32 @@
     </style>
 </head>
 <body>
-    <div id="debugInfo">WS: 待機中...</div>
+    <div id="debugInfo">WS: 通信路の構築中...</div>
     <div class="main-container">
         <div class="points-display" id="userPoints">0</div>
         <div class="status-display" id="betStatus">接続中...</div>
     </div>
     <script>
-        // ngrokのURL（https:// は絶対に含めない）
+        // ngrokのURL
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
         let ws;
 
         function connect() {
-            // ★wss:// を使用し、GitHubのHTTPS制限を回避します
+            // ★【最重要】GitHubのHTTPS制限を回避するため wss:// を使用
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
 
             ws.onopen = () => { 
-                console.log("★★★ WS CONNECTED (WSS) ★★★"); 
-                document.getElementById('debugInfo').innerText = "ONLINE: 実況中";
+                console.log("★★★ 通信確立 (Secure) ★★★"); 
+                document.getElementById('debugInfo').innerText = "ONLINE: 開通";
                 
-                // v1.0.4 用の命令
+                // サーバーへのアクション購読命令
                 ws.send(JSON.stringify({
                     "request": "Subscribe",
                     "id": "POGGY_SUB",
                     "events": { "Raw": ["Action"] }
                 }));
+
+                // ポイント取得アクション実行
                 ws.send(JSON.stringify({
                     "request": "DoAction",
                     "id": "POGGY_INIT",
@@ -44,7 +46,7 @@
             };
 
             ws.onmessage = (event) => {
-                console.log("★受信:", event.data);
+                console.log("★データ受信:", event.data);
                 try {
                     const data = JSON.parse(event.data);
                     if (data.user_points !== undefined) {
