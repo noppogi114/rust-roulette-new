@@ -6,11 +6,11 @@
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
-        /* ユーザー名の表示位置（仮：所持ポイントの少し上） */
-        .user-name-display { position: absolute; top: 71.0%; left: 14.5%; width: 20%; height: 5%; display: flex; align-items: center; color: #ffcc00; font-size: 1.8vw; font-weight: bold; }
-        /* 所持ポイントの表示位置 */
-        .points-display { position: absolute; top: 76.5%; left: 14.5%; width: 20%; height: 6%; display: flex; align-items: center; color: #ffffff; font-size: 2.3vw; font-weight: bold; }
-        .status-display { position: absolute; top: 91.0%; left: 51.0%; width: 30%; height: 6%; display: flex; align-items: center; color: #ef4444; font-size: 2.2vw; font-weight: bold; }
+        /* 名前の位置 */
+        .user-name-display { position: absolute; top: 71.0%; left: 14.5%; width: 20%; color: #ffcc00; font-size: 1.8vw; font-weight: bold; }
+        /* ポイントの位置 */
+        .points-display { position: absolute; top: 76.5%; left: 14.5%; width: 20%; color: #ffffff; font-size: 2.3vw; font-weight: bold; }
+        .status-display { position: absolute; top: 91.0%; left: 51.0%; width: 30%; color: #ef4444; font-size: 2.2vw; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -35,13 +35,10 @@
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                console.log("WS: RECEIVED ->", data);
+                console.log("WS: RECEIVED ->", data); // ここに user_points が出るかチェック
                 
-                // 名前の反映
-                if (data.user_name) {
-                    document.getElementById('userNameDisplay').innerText = data.user_name;
-                }
-                // ポイントの反映
+                if (data.user_name) document.getElementById('userNameDisplay').innerText = data.user_name;
+                
                 if (data.user_points !== undefined) {
                     document.getElementById('userPoints').innerText = Number(data.user_points).toLocaleString();
                     document.getElementById('betStatus').innerText = "受付終了";
