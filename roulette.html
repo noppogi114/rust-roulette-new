@@ -25,20 +25,25 @@
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
             ws.onopen = () => { 
                 console.log("★★★ WS CONNECTED ★★★");
+                // イベント購読
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "P_SUB", "events": { "Raw": ["Action"] } }));
+                // 実行
                 setTimeout(() => {
-                    // ここがアクションリストにある名前と一致している必要があります
                     ws.send(JSON.stringify({ "request": "DoAction", "id": "P_INIT", "action": { "name": "SEND_USER_POINTS" } }));
                 }, 500);
             };
 
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                console.log("RECEIVED:", data);
-                if (data.user_name) document.getElementById('userNameDisplay').innerText = data.user_name;
+                
+                // 【超重要】ボットの標準報告(status:okなど)は無視し、中身がある時だけ処理
                 if (data.user_points !== undefined) {
+                    console.log("✅ 生データ受信成功:", data);
+                    if (data.user_name) document.getElementById('userNameDisplay').innerText = data.user_name;
                     document.getElementById('userPoints').innerText = Number(data.user_points).toLocaleString();
                     document.getElementById('betStatus').innerText = "受付終了";
+                } else {
+                    console.log("ℹ️ ボットのシステム報告を受信（無視）");
                 }
             };
             ws.onclose = () => { setTimeout(connect, 3000); };
