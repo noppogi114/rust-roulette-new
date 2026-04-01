@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>POGGI RUST ROULETTE</title>
+    <title>POGGI RUST ROULETTE (0.1s SYNC)</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
@@ -20,7 +20,7 @@
     </style>
 </head>
 <body>
-    <div id="debugInfo">DEBUG: 待機中...</div>
+    <div id="debugInfo">WS: 待機中...</div>
     <div class="main-container">
         <div class="number-selector">
             <div class="num-div" onclick="selectNumber('1', this)"></div>
@@ -35,44 +35,49 @@
         <div class="status-display" id="betStatus">接続中...</div>
         <div id="betPopup"></div>
     </div>
-
     <script>
-        // ★★★ ngrokのURLを最新のものに書き換えてください ★★★
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
-
         let ws;
         let selectedNum = "";
         let isBettingOpen = false;
-        let hasAlreadyBetted = false;
-        let lastWinnerData = ""; 
-        let lastBetAmount = 0;
         let popupTimer = null;
 
         function connect() {
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
             ws.onopen = () => { 
-                console.log("WS Connected"); 
-                document.getElementById('debugInfo').innerText = "ONLINE: 接続成功";
+                console.log("★★★ WS CONNECTED SUCCESSFULLY ★★★"); 
+                document.getElementById('debugInfo').innerText = "ONLINE: 実況中";
+                ws.send(JSON.stringify({ "request": "DoAction", "action": { "name": "SEND_USER_POINTS" } }));
             };
-
-            // 【追加】リアルタイムメッセージ受信
             ws.onmessage = (event) => {
+                console.log("信号受信！内容:", event.data);
                 try {
                     const data = JSON.parse(event.data);
-                    // SEND_USER_POINTS アクションから送られてくるポイント情報を反映
                     if (data.user_points !== undefined) {
                         document.getElementById('userPoints').innerText = Number(data.user_points).toLocaleString();
-                        console.log("WebSocket Point Sync:", data.user_points);
+                    }
+                    if (data.is_open !== undefined) {
+                        const el = document.getElementById('betStatus');
+                        isBettingOpen = data.is_open;
+                        if (isBettingOpen) {
+                            el.innerText = "受付中";
+                            el.style.color = "#22c55e";
+                            document.querySelectorAll('.num-div').forEach(d => d.classList.remove('selected'));
+                            selectedNum = "";
+                        } else {
+                            el.innerText = "受付終了";
+                            el.style.color = "#ef4444";
+                        }
+                    }
+                    if (data.poggi_msg !== undefined) {
+                        const isWin = data.poggi_msg.includes("当選");
+                        showPopup(data.poggi_msg, isWin ? "pop-win" : "pop-lose", 6000);
                     }
                 } catch (e) {
-                    console.log("Message error:", e);
+                    console.log("生データ受信:", event.data);
                 }
             };
-
-            ws.onclose = () => { 
-                document.getElementById('debugInfo').innerText = "OFFLINE: 再接続中...";
-                setTimeout(connect, 3000); 
-            };
+            ws.onclose = () => { setTimeout(connect, 3000); };
         }
         connect();
 
@@ -89,101 +94,23 @@
             p.innerText = text;
             p.className = className;
             p.style.display = 'block';
-            popupTimer = setTimeout(() => {
-                p.style.display = 'none';
-                popupTimer = null;
-            }, duration);
+            popupTimer = setTimeout(() => { p.style.display = 'none'; }, duration);
         }
 
         function executeBet() {
-            const amountInput = document.getElementById('betAmount');
-            const amount = parseInt(amountInput.value);
+            const amount = parseInt(document.getElementById('betAmount').value);
             const currentTotal = parseInt(document.getElementById('userPoints').innerText.replace(/,/g, ""));
-
             if(!isBettingOpen || !selectedNum) return;
-
-            if (amount > currentTotal && !hasAlreadyBetted) {
-                alert("ポイントが足りません！");
-                return;
-            }
-
-            lastBetAmount = amount;
-            const msg = hasAlreadyBetted ? 
-                "noppogi が " + selectedNum + "番に上書きしました！" : 
-                "noppogi が " + selectedNum + "番に " + amount.toLocaleString() + " 賭けました！";
-            
-            showPopup(msg, "", 3000);
-
+            if (amount > currentTotal) { alert("ポイント不足"); return; }
             if(ws && ws.readyState === 1) {
                 ws.send(JSON.stringify({
                     "request": "DoAction",
                     "action": { "name": "BET KAKE" },
-                    "args": { "betTarget": String(selectedNum), "betAmount": String(amount) },
-                    "id": "POGGY_" + Date.now()
+                    "args": { "betTarget": String(selectedNum), "betAmount": String(amount) }
                 }));
-                hasAlreadyBetted = true;
+                showPopup(selectedNum + "番に賭けました", "", 3000);
             }
         }
-
-        // --- 物理監視（ポーリング）セクション ---
-        // WebSocketが切れた場合や初回読み込みのために残していますが、WSが優先されます
-        function updateLoop() {
-            const t = new Date().getTime();
-            const files = [
-                { id: 'userPoints', file: 'points.txt', isPoint: true },
-                { id: 'betStatus', file: 'bet_status.txt', isStatus: true },
-                { id: 'winner', file: 'winner.txt', isWinner: true }
-            ];
-
-            files.forEach(item => {
-                const xhr = new XMLHttpRequest();
-                xhr.open("GET", item.file + "?v=" + t, true);
-                xhr.onreadystatechange = function() {
-                    if (xhr.readyState === 4 && xhr.status === 200) {
-                        const txt = xhr.responseText.trim();
-                        
-                        if (item.isPoint) {
-                            // WebSocketが接続されていない時のみtxtを反映（二重更新防止）
-                            if(ws && ws.readyState !== 1) {
-                                if(txt !== "" && !isNaN(txt.replace(/,/g, ""))) {
-                                    document.getElementById('userPoints').innerText = Number(txt.replace(/,/g, "")).toLocaleString();
-                                }
-                            }
-                        } else if (item.isStatus) {
-                            const el = document.getElementById('betStatus');
-                            if (txt.indexOf("1") !== -1) {
-                                isBettingOpen = true;
-                                el.innerText = "受付開始";
-                                el.style.color = "#22c55e";
-                            } else {
-                                isBettingOpen = false;
-                                hasAlreadyBetted = false;
-                                el.innerText = "受付終了";
-                                el.style.color = "#ef4444";
-                            }
-                        } else if (item.isWinner) {
-                            if (txt !== "" && txt !== lastWinnerData) {
-                                lastWinnerData = txt;
-                                if (txt.includes("noppogi")) {
-                                    const payout = txt.split(",")[1];
-                                    showPopup("🎉 WIN!! +" + Number(payout).toLocaleString(), "pop-win", 6000);
-                                } else if (txt === "lose") {
-                                    const loseAmt = lastBetAmount > 0 ? " -" + lastBetAmount.toLocaleString() : "";
-                                    showPopup("💀 LOSE..." + loseAmt, "pop-lose", 6000);
-                                }
-                                lastBetAmount = 0;
-                            } else if (txt === "" && lastWinnerData !== "") {
-                                lastWinnerData = "";
-                            }
-                        }
-                    }
-                };
-                xhr.send();
-            });
-        }
-
-        setInterval(updateLoop, 500);
-        updateLoop();
     </script>
 </body>
 </html>
