@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>POGGI RUST ROULETTE (0.1s SYNC)</title>
+    <title>POGGI RUST ROULETTE (FINAL SYNC)</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
@@ -20,7 +20,7 @@
     </style>
 </head>
 <body>
-    <div id="debugInfo">WS: 待機中...</div>
+    <div id="debugInfo">WS: 接続待機中</div>
     <div class="main-container">
         <div class="number-selector">
             <div class="num-div" onclick="selectNumber('1', this)"></div>
@@ -45,12 +45,12 @@
         function connect() {
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
             ws.onopen = () => { 
-                console.log("★★★ WS CONNECTED SUCCESSFULLY ★★★"); 
+                console.log("★★★ WS CONNECTED ★★★"); 
                 document.getElementById('debugInfo').innerText = "ONLINE: 実況中";
                 ws.send(JSON.stringify({ "request": "DoAction", "action": { "name": "SEND_USER_POINTS" } }));
             };
             ws.onmessage = (event) => {
-                console.log("信号受信！内容:", event.data);
+                console.log("データ受信:", event.data);
                 try {
                     const data = JSON.parse(event.data);
                     if (data.user_points !== undefined) {
@@ -58,9 +58,9 @@
                     }
                     if (data.is_open !== undefined) {
                         const el = document.getElementById('betStatus');
-                        isBettingOpen = data.is_open;
+                        isBettingOpen = (data.is_open === true || data.is_open === "true" || data.is_open === 1);
                         if (isBettingOpen) {
-                            el.innerText = "受付中";
+                            el.innerText = "受付開始";
                             el.style.color = "#22c55e";
                             document.querySelectorAll('.num-div').forEach(d => d.classList.remove('selected'));
                             selectedNum = "";
@@ -73,9 +73,7 @@
                         const isWin = data.poggi_msg.includes("当選");
                         showPopup(data.poggi_msg, isWin ? "pop-win" : "pop-lose", 6000);
                     }
-                } catch (e) {
-                    console.log("生データ受信:", event.data);
-                }
+                } catch (e) { console.log("JSON Parse Error", e); }
             };
             ws.onclose = () => { setTimeout(connect, 3000); };
         }
@@ -104,8 +102,7 @@
             if (amount > currentTotal) { alert("ポイント不足"); return; }
             if(ws && ws.readyState === 1) {
                 ws.send(JSON.stringify({
-                    "request": "DoAction",
-                    "action": { "name": "BET KAKE" },
+                    "request": "DoAction", "action": { "name": "BET KAKE" },
                     "args": { "betTarget": String(selectedNum), "betAmount": String(amount) }
                 }));
                 showPopup(selectedNum + "番に賭けました", "", 3000);
