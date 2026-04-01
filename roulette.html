@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>POGGI RUST ROULETTE (RE-SYNC)</title>
+    <title>POGGI RUST ROULETTE (HYPER SYNC)</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
@@ -46,32 +46,33 @@
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
             ws.onopen = () => { 
                 console.log("★★★ WS CONNECTED ★★★"); 
-                document.getElementById('debugInfo').innerText = "ONLINE: 実況中";
-                // 初回ポイント取得
+                document.getElementById('debugInfo').innerText = "ONLINE: 接続中";
+                // 接続時にポイント取得アクションを実行
                 ws.send(JSON.stringify({ "request": "DoAction", "action": { "name": "SEND_USER_POINTS" } }));
             };
-
             ws.onmessage = (event) => {
-                console.log("信号受信:", event.data);
+                console.log("受信データ:", event.data);
                 try {
                     const data = JSON.parse(event.data);
-                    const el = document.getElementById('betStatus');
-
-                    // 1. 受付ステータスの判定（信号が来たら即座に反映）
-                    if (event.data.includes('"is_open":true') || event.data.includes('"is_open": 1')) {
-                        isBettingOpen = true;
-                        el.innerText = "受付開始";
-                        el.style.color = "#22c55e";
-                        document.querySelectorAll('.num-div').forEach(d => d.classList.remove('selected'));
-                    } else if (event.data.includes('"is_open":false') || event.data.includes('"is_open": 0')) {
-                        isBettingOpen = false;
-                        el.innerText = "受付終了";
-                        el.style.color = "#ef4444";
-                    }
-
-                    // 2. ポイントの反映
+                    
+                    // 1. ポイントの反映
                     if (data.user_points !== undefined) {
                         document.getElementById('userPoints').innerText = Number(data.user_points).toLocaleString();
+                    }
+
+                    // 2. 受付ステータスの反映
+                    if (data.is_open !== undefined) {
+                        const el = document.getElementById('betStatus');
+                        isBettingOpen = data.is_open === true || data.is_open === "true" || data.is_open === 1;
+                        if (isBettingOpen) {
+                            el.innerText = "受付開始";
+                            el.style.color = "#22c55e";
+                            document.querySelectorAll('.num-div').forEach(d => d.classList.remove('selected'));
+                            selectedNum = "";
+                        } else {
+                            el.innerText = "受付終了";
+                            el.style.color = "#ef4444";
+                        }
                     }
 
                     // 3. メッセージ表示
@@ -80,7 +81,7 @@
                         showPopup(data.poggi_msg, isWin ? "pop-win" : "pop-lose", 6000);
                     }
                 } catch (e) {
-                    console.log("JSON Error:", e);
+                    console.log("JSON Parse Error:", e);
                 }
             };
             ws.onclose = () => { setTimeout(connect, 3000); };
