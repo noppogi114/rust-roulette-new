@@ -7,7 +7,7 @@
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
         
-        /* ポギーさんの「正確だった」数値をそのまま採用 */
+        /* ポギーさんの「正確な位置」数値を維持 */
         .number-selector { position: absolute; top: 22.2%; left: 15.5%; width: 69.0%; height: 32.0%; display: flex; justify-content: space-between; align-items: center; z-index: 100; }
         .num-div { width: 16%; height: 95%; cursor: pointer; border-radius: 15px; transition: 0.2s; }
         .num-div.selected { background: rgba(255, 255, 255, 0.4); box-shadow: 0 0 25px 10px #ffffff; border: 2px solid #ffffff; }
@@ -17,7 +17,6 @@
         .points-display { position: absolute; top: 76.5%; left: 14.5%; width: 20%; height: 6%; display: flex; align-items: center; color: #ffffff; font-size: 2.3vw; font-weight: bold; }
         .status-display { position: absolute; top: 91.0%; left: 51.0%; width: 30%; height: 6%; display: flex; align-items: center; color: #ef4444; font-size: 2.2vw; font-weight: bold; text-shadow: 2px 2px 4px #000; }
         
-        /* 各番号にいくら賭けているかのラベル（追加） */
         .bet-label { position: absolute; bottom: -25px; left: 0; width: 100%; text-align: center; color: #fff; font-size: 1.2vw; font-weight: bold; text-shadow: 2px 2px 2px #000; pointer-events: none; }
         
         #betPopup { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.95); padding: 20px 40px; border-radius: 15px; font-size: 2.8vw; font-weight: bold; z-index: 999; display: none; text-shadow: 2px 2px 4px #000; white-space: nowrap; pointer-events: none; border: 4px solid #ffd700; color: #ffd700; }
@@ -49,25 +48,31 @@
             ws.onopen = () => { 
                 console.log("★★★ WS CONNECTED ★★★"); 
                 document.getElementById('debugInfo').innerText = "ONLINE: 接続中";
+                // 購読と初期データ取得
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "sub", "events": { "General": ["Custom"] } }));
                 ws.send(JSON.stringify({ "request": "DoAction", "id": "init", "action": { "name": "SEND_USER_POINTS" } }));
             };
             ws.onmessage = (event) => {
-                const data = JSON.parse(event.data).data || JSON.parse(event.data);
-                // ポイント反映 (p)
-                if (data.p !== undefined) {
-                    document.getElementById('userPoints').innerText = Number(data.p).toLocaleString();
+                const res = JSON.parse(event.data);
+                // 【修正】 data階層があってもなくても読み取れるように統合
+                const d = res.data || res;
+
+                // ポイント反映
+                if (d.p !== undefined) {
+                    document.getElementById('userPoints').innerText = Number(d.p).toLocaleString();
                 }
-                // ステータス反映 (is_open)
-                if (data.is_open !== undefined) {
+
+                // 受付ステータス反映 (ボット側の is_betting_open または is_open に対応)
+                const openStatus = d.is_betting_open !== undefined ? d.is_betting_open : d.is_open;
+                if (openStatus !== undefined) {
                     const el = document.getElementById('betStatus');
-                    isBettingOpen = (data.is_open === true || data.is_open === 1);
-                    el.innerText = isBettingOpen ? "受付中" : "受付終了";
+                    isBettingOpen = (openStatus === true || openStatus === 1 || openStatus === "1");
+                    el.innerText = isBettingOpen ? "受付開始" : "受付終了";
                     el.style.color = isBettingOpen ? "#22c55e" : "#ef4444";
                     if (!isBettingOpen) resetBets();
                 }
-                // ボットからのメッセージ
-                if (data.poggi_msg !== undefined) showPopup(data.poggi_msg, 6000);
+
+                if (d.poggi_msg !== undefined) showPopup(d.poggi_msg, 6000);
             };
             ws.onclose = () => { setTimeout(connect, 3000); };
         }
@@ -87,7 +92,6 @@
             
             if (amount > currentTotal) { showPopup("ポイント不足", 2000); return; }
 
-            // 【重要】 malformed command 回避のため id を追加
             ws.send(JSON.stringify({
                 "request": "DoAction",
                 "id": "bet_" + Date.now(),
