@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>POGGI RUST ROULETTE (127 SYNC)</title>
+    <title>POGGI RUST ROULETTE (FINAL WSS)</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
@@ -12,22 +12,25 @@
     </style>
 </head>
 <body>
-    <div id="debugInfo">WS: 準備中...</div>
+    <div id="debugInfo">WS: 待機中...</div>
     <div class="main-container">
         <div class="points-display" id="userPoints">0</div>
         <div class="status-display" id="betStatus">接続中...</div>
     </div>
     <script>
+        // ngrokのURL（https:// は絶対に含めない）
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
         let ws;
 
         function connect() {
-            // ★重要：wss ではなく ws にします（ngrok 501エラー回避のため）
-            ws = new WebSocket("ws://" + NGROK_URL + "/streamerbot");
+            // ★wss:// を使用し、GitHubのHTTPS制限を回避します
+            ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
 
             ws.onopen = () => { 
-                console.log("★★★ 通信確立成功 ★★★"); 
-                document.getElementById('debugInfo').innerText = "ONLINE";
+                console.log("★★★ WS CONNECTED (WSS) ★★★"); 
+                document.getElementById('debugInfo').innerText = "ONLINE: 実況中";
+                
+                // v1.0.4 用の命令
                 ws.send(JSON.stringify({
                     "request": "Subscribe",
                     "id": "POGGY_SUB",
@@ -41,7 +44,7 @@
             };
 
             ws.onmessage = (event) => {
-                console.log("信号受信:", event.data);
+                console.log("★受信:", event.data);
                 try {
                     const data = JSON.parse(event.data);
                     if (data.user_points !== undefined) {
@@ -60,6 +63,7 @@
             };
 
             ws.onclose = () => { setTimeout(connect, 3000); };
+            ws.onerror = (e) => { console.error("🚨 通信エラー:", e); };
         }
         connect();
     </script>
