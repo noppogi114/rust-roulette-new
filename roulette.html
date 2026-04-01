@@ -2,32 +2,27 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>POGGI ROULETTE DEBUG</title>
+    <title>POGGY RUST ROULETTE FINAL</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
         .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
         .points-display { position: absolute; top: 76.5%; left: 14.5%; width: 20%; height: 6%; display: flex; align-items: center; color: #ffffff; font-size: 2.3vw; font-weight: bold; }
-        .status-display { position: absolute; top: 91.0%; left: 51.0%; width: 30%; height: 6%; display: flex; align-items: center; color: #ef4444; font-size: 2.2vw; font-weight: bold; text-shadow: 2px 2px 4px #000; }
-        #ws-log { position: fixed; top: 0; left: 0; background: rgba(0,255,0,0.2); color: #0f0; font-family: monospace; z-index: 10000; pointer-events: none; }
+        .status-display { position: absolute; top: 91.0%; left: 51.0%; width: 30%; height: 6%; display: flex; align-items: center; color: #ef4444; font-size: 2.2vw; font-weight: bold; }
     </style>
 </head>
 <body>
-    <div id="ws-log">WS: 起動中...</div>
     <div class="main-container">
         <div class="points-display" id="userPoints">0</div>
         <div class="status-display" id="betStatus">接続中...</div>
     </div>
     <script>
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
-        const log = (txt) => { document.getElementById('ws-log').innerText = txt; console.log(txt); };
         let ws;
 
         function connect() {
-            log("WS: 接続試行中...");
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
-
             ws.onopen = () => { 
-                log("WS: ★★★ 開通成功 ★★★"); 
+                console.log("★★★ CONNECT SUCCESS ★★★");
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "P_SUB", "events": { "Raw": ["Action"] } }));
                 setTimeout(() => {
                     ws.send(JSON.stringify({ "request": "DoAction", "id": "P_INIT", "action": { "name": "SEND_USER_POINTS" } }));
@@ -35,19 +30,23 @@
             };
 
             ws.onmessage = (event) => {
-                log("WS: 受信！ " + event.data.substring(0, 50));
-                const data = JSON.parse(event.data);
-                let p = null;
-                if (data.user_points !== undefined) p = data.user_points;
-                else if (data.data && data.data.arguments && data.data.arguments.user_points !== undefined) p = data.data.arguments.user_points;
+                try {
+                    const data = JSON.parse(event.data);
+                    console.log("DATA RECEIVED:", data);
+                    
+                    let p = null;
+                    if (data.user_points !== undefined) p = data.user_points;
+                    else if (data.data && data.data.arguments && data.data.arguments.user_points !== undefined) p = data.data.arguments.user_points;
 
-                if (p !== null) {
-                    document.getElementById('userPoints').innerText = Number(p).toLocaleString();
-                    document.getElementById('betStatus').innerText = "受付終了";
+                    if (p !== null) {
+                        document.getElementById('userPoints').innerText = Number(p).toLocaleString();
+                        document.getElementById('betStatus').innerText = "受付終了";
+                    }
+                } catch (e) {
+                    console.error("JSON ERROR:", e);
                 }
             };
-            ws.onclose = () => { log("WS: 切断中... 3秒後再試行"); setTimeout(connect, 3000); };
-            ws.onerror = (e) => { log("WS: 🚨 エラー発生"); };
+            ws.onclose = () => { setTimeout(connect, 3000); };
         }
         connect();
     </script>
