@@ -17,7 +17,7 @@
 <body>
     <div class="board">
         <h2>🏆 TOP 10 RANKING</h2>
-        <table><tbody id="ranking-body"><tr><td colspan="3" style="text-align:center;">接続待機中...</td></tr></tbody></table>
+        <table><tbody id="ranking-body"><tr><td colspan="3" style="text-align:center;">接続中...</td></tr></tbody></table>
     </div>
     <script>
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
@@ -26,15 +26,28 @@
             ws = new WebSocket("wss://" + NGROK_URL);
             ws.onopen = () => {
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "ranking", "events": { "General": ["Custom"] } }));
-                setInterval(() => ws.send(JSON.stringify({ "request": "DoAction", "id": "gr", "action": { "name": "GetLeaderboard" } })), 5000);
+                // 5秒おきに最新の変数をボットに問い合わせる
+                setInterval(() => {
+                    ws.send(JSON.stringify({ "request": "GetGlobalVariable", "id": "gr", "variable": "current_leaderboard_json", "persisted": true }));
+                }, 5000);
             };
             ws.onmessage = (e) => {
                 const res = JSON.parse(e.data);
-                const d = res.data || res;
-                if (d.type === "leaderboard" && d.data) {
+                let list = null;
+
+                // 1. 変数の問い合わせに対する返信(value)をチェック
+                if (res.id === "gr" && res.status === "ok" && res.value) {
+                    list = JSON.parse(res.value);
+                } 
+                // 2. 放送(broadcast)をチェック
+                else if (res.data && res.data.type === "leaderboard") {
+                    list = res.data.data;
+                }
+
+                if (list) {
                     const body = document.getElementById('ranking-body');
                     body.innerHTML = "";
-                    d.data.forEach((u, i) => {
+                    list.forEach((u, i) => {
                         const tr = document.createElement('tr');
                         tr.innerHTML = `<td class="rank">${i+1}</td><td>${u.name}</td><td class="points">${u.p.toLocaleString()}</td>`;
                         body.appendChild(tr);
