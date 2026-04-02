@@ -4,15 +4,15 @@
     <meta charset="UTF-8">
     <title>POGGI ROULETTE LEADERBOARD</title>
     <style>
-        body { background-color: #1a1a1a; color: white; font-family: sans-serif; padding: 20px; margin: 0; }
-        .board { width: 350px; background: rgba(30, 30, 30, 0.95); border: 2px solid #4ade80; border-radius: 10px; padding: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        h2 { margin: 0 0 10px 0; text-align: center; color: #4ade80; border-bottom: 1px solid #4ade80; padding-bottom: 8px; font-size: 20px; }
+        body { background-color: #1a1a1a; color: white; font-family: sans-serif; padding: 15px; margin: 0; }
+        .board { width: 350px; background: rgba(30, 30, 30, 0.95); border: 2px solid #4ade80; border-radius: 10px; padding: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
+        h2 { margin: 0 0 10px 0; text-align: center; color: #4ade80; border-bottom: 1px solid #4ade80; padding-bottom: 8px; font-size: 18px; }
         table { width: 100%; border-collapse: collapse; }
-        tr { border-bottom: 1px solid #444; }
-        th { text-align: left; color: #888; font-size: 12px; padding: 5px; }
-        td { padding: 10px 5px; font-size: 15px; }
-        .rank { width: 40px; text-align: center; font-weight: bold; color: #ffd700; }
-        .name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #eee; }
+        tr { border-bottom: 1px solid #333; }
+        th { text-align: left; color: #888; font-size: 11px; padding: 5px; }
+        td { padding: 8px 5px; font-size: 14px; }
+        .rank { width: 35px; text-align: center; font-weight: bold; color: #ffd700; }
+        .name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .points { text-align: right; color: #4ade80; font-family: monospace; font-weight: bold; }
     </style>
 </head>
@@ -24,7 +24,7 @@
                 <tr><th>位</th><th>プレイヤー</th><th style="text-align: right;">ポイント</th></tr>
             </thead>
             <tbody id="ranking-body">
-                <tr><td colspan="3" style="text-align:center; padding: 20px;">接続中...</td></tr>
+                <tr><td colspan="3" style="text-align:center; padding: 20px;">データ受信待機中...</td></tr>
             </tbody>
         </table>
     </div>
@@ -42,18 +42,20 @@
 
             ws.onmessage = (event) => {
                 const res = JSON.parse(event.data);
-                console.log("受信データ:", res); // コンソールで中身を確認
-                
-                // あらゆる階層から type: "leaderboard" を探す
-                const findData = (obj) => {
-                    if (obj.type === "leaderboard") return obj.list || obj.data;
-                    if (obj.data) return findData(obj.data);
-                    return null;
-                };
+                console.log("Raw Data:", res);
 
-                const rankingList = findData(res);
-                if (rankingList) {
-                    updateBoard(rankingList);
+                // 文字列として検索して leaderboard 判定
+                const rawString = event.data;
+                if (rawString.includes('"type":"leaderboard"')) {
+                    // 階層に関わらず、中にある list 配列を探し出す
+                    const findList = (obj) => {
+                        if (obj.list) return obj.list;
+                        if (obj.data && obj.data.list) return obj.data.list;
+                        if (typeof obj.data === 'object') return findList(obj.data);
+                        return null;
+                    };
+                    const list = findList(res);
+                    if (list) updateBoard(list);
                 }
             };
 
@@ -73,14 +75,14 @@
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="rank">${index + 1}</td>
-                    <td class="name">${user.name || user.Name}</td>
-                    <td class="points">${Number(user.p || user.Points).toLocaleString()}</td>
+                    <td class="name">${user.name}</td>
+                    <td class="points">${Number(user.p).toLocaleString()}</td>
                 `;
                 body.appendChild(tr);
             });
         }
 
-        setInterval(refresh, 10000); // 10秒更新
+        setInterval(refresh, 5000); // 5秒おきにリクエスト
         connect();
     </script>
 </body>
