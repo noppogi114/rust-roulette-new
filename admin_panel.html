@@ -11,14 +11,15 @@
         .btn-start { background: #22c55e; color: white; }
         .btn-end { background: #ef4444; color: white; }
         .btn-action { background: #3b82f6; color: white; }
-        .btn-link { background: #6366f1; color: white; text-decoration: none; display: inline-block; }
+        .btn-link { background: #6366f1; color: white; text-decoration: none; display: inline-block; padding: 10px 20px; border-radius: 5px; font-weight: bold; }
+        
         /* 無効化時のスタイル */
         .btn:disabled { background: #555 !important; cursor: not-allowed; opacity: 0.5; }
         input:disabled { background: #333 !important; color: #777 !important; cursor: not-allowed; }
         
         input { padding: 10px; border-radius: 5px; border: 1px solid #444; background: #111; color: white; width: 150px; }
         .flex { display: flex; gap: 10px; align-items: center; margin-bottom: 15px; }
-        .log { background: #000; padding: 10px; border-radius: 5px; font-family: monospace; height: 200px; overflow-y: auto; color: #7afade; font-size: 13px; border: 1px solid #333; line-height: 1.6; }
+        .log { background: #000; padding: 10px; border-radius: 5px; font-family: monospace; height: 250px; overflow-y: auto; color: #7afade; font-size: 13px; border: 1px solid #333; line-height: 1.6; }
         .log-error { color: #ff4444; font-weight: bold; }
         .log-success { color: #4ade80; }
     </style>
@@ -30,7 +31,7 @@
         <h2>1. 受付管理</h2>
         <button class="btn btn-start" id="btnStart" onclick="doAction('BET START')">受付開始</button>
         <button class="btn btn-end" id="btnEnd" onclick="doAction('BET END')">受付締切</button>
-        <a href="https://noppogi114.github.io/rust-roulette-new/roulette.html?user=648787629" target="_blank" class="btn btn-link">リスナー用画面を確認</a>
+        <a href="https://noppogi114.github.io/rust-roulette-new/roulette.html?user=445124929" target="_blank" class="btn btn-link">自分の画面を開く</a>
     </div>
 
     <div class="card">
@@ -40,14 +41,14 @@
             <button class="btn btn-action" id="btnHaito" onclick="executeWin()" disabled>配当を配る</button>
         </div>
         <p id="haitoStatusMsg" style="font-size: 12px; color: #ef4444; margin-top: 5px; font-weight: bold;">
-            【待機中】受付を締切ると入力可能になります
+            【接続待機中】Streamer.botに接続してください
         </p>
     </div>
 
     <div class="card">
         <h2>3. ポイント個別操作</h2>
         <div class="flex">
-            <input type="text" id="targetUser" placeholder="ユーザー名" value="noppogi">
+            <input type="text" id="targetUser" placeholder="ユーザーID" value="445124929">
             <input type="number" id="pointAmount" placeholder="枚数">
             <button class="btn btn-action" onclick="sendPoints()">ポイントを送る</button>
         </div>
@@ -57,17 +58,20 @@
 
     <script>
         let ws;
-        const wsUrl = "ws://localhost:8080/";
+        // エラーログの "/streamerbot" を削除した正しい接続先です
+        const wsUrl = "ws://127.0.0.1:8080/";
         const validNumbers = [1, 3, 5, 10, 20];
 
         function connect() {
+            log(wsUrl + " に接続を試行しています...");
             ws = new WebSocket(wsUrl);
+
             ws.onopen = () => {
                 log("★Streamer.botに接続成功", "success");
-                // 現在の状態を購読
+                // 状態監視を開始
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "admin_sub", "events": { "General": ["Custom"] } }));
-                // 初期化：今の受付状態を確認
-                ws.send(JSON.stringify({ "request": "DoAction", "id": "init_check", "action": { "name": "SEND_USER_POINTS" }, "args": { "targetUser": "648787629" } }));
+                // 現在の受付状態を確認するために信号を送る
+                ws.send(JSON.stringify({ "request": "DoAction", "id": "init_check", "action": { "name": "SEND_USER_POINTS" }, "args": { "targetUser": "445124929" } }));
             };
             
             ws.onmessage = (event) => {
@@ -81,14 +85,17 @@
                 }
             };
 
+            ws.onerror = (err) => {
+                log("WebSocketエラーが発生しました。接続先が正しいか確認してください。", "error");
+            };
+
             ws.onclose = () => { 
-                log("!! 接続が切れました。再接続中...", "error");
+                log("!! 接続が切れました。3秒後に再接続します...", "error");
                 setTimeout(connect, 3000); 
             };
         }
         connect();
 
-        // 受付状態に合わせて入力可否を切り替える関数
         function updateUI(isOpen) {
             const winInput = document.getElementById('winNum');
             const haitoBtn = document.getElementById('btnHaito');
@@ -97,7 +104,6 @@
             const endBtn = document.getElementById('btnEnd');
 
             if (isOpen) {
-                // 受付中のとき
                 winInput.disabled = true;
                 haitoBtn.disabled = true;
                 startBtn.disabled = true;
@@ -105,7 +111,6 @@
                 msg.innerText = "【受付中】締切るまで当選番号は入力できません";
                 msg.style.color = "#aaa";
             } else {
-                // 締切済のとき
                 winInput.disabled = false;
                 haitoBtn.disabled = false;
                 startBtn.disabled = false;
@@ -136,20 +141,18 @@
                 "args": extraArgs, 
                 "id": "PoggiAdmin_" + Date.now() 
             }));
-            log(actionName + " を送信しました");
+            log(actionName + " 命令を送信しました");
         }
 
         function executeWin() {
             const input = document.getElementById('winNum');
             const num = parseInt(input.value);
             
-            // ルールチェック：1,3,5,10,20以外は弾く
             if (!validNumbers.includes(num)) {
                 alert("不正な番号です。1, 3, 5, 10, 20 のいずれかを入力してください。");
                 return;
             }
 
-            // BET WINNER アクションに arg1 として番号を渡す
             doAction("BET WINNER", { "arg1": String(num) });
             log(`✅ 当選番号 [${num}] で配当処理を開始しました`, "success");
             input.value = ""; 
@@ -158,7 +161,7 @@
         function sendPoints() {
             const user = document.getElementById('targetUser').value.trim();
             const amt = document.getElementById('pointAmount').value;
-            if(!user || !amt) return alert("ユーザー名と枚数を入れてね");
+            if(!user || !amt) return alert("ユーザーIDと枚数を入れてね");
             doAction("GIVE_POINTS", { "targetUser": user, "pointValue": amt });
             log(`${user} に ${amt} ポイント送付命令を送信`, "success");
         }

@@ -95,7 +95,7 @@
 
         const urlParams = new URLSearchParams(window.location.search);
         const urlID = urlParams.get('user');
-        const urlKey = urlParams.get('key'); // URLから合鍵(key)を取得
+        const urlKey = urlParams.get('key'); 
 
         window.onload = () => {
             if (urlID && urlKey) {
@@ -138,6 +138,15 @@
             ws = new WebSocket("wss://" + NGROK_URL);
             ws.onopen = () => { 
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "sub", "events": { "General": ["Custom"] } }));
+                
+                // ★追加：ログイン時に名前をボットのアクション「SaveUserName」へ送る
+                ws.send(JSON.stringify({ 
+                    "request": "DoAction", 
+                    "id": "save_name", 
+                    "action": { "name": "SaveUserName" }, 
+                    "args": { "targetUser": myID, "userName": myNick } 
+                }));
+
                 ws.send(JSON.stringify({ "request": "DoAction", "id": "init", "action": { "name": "SEND_USER_POINTS" }, "args": { "targetUser": myID, "key": myKey } }));
             };
             ws.onmessage = (event) => {
@@ -182,7 +191,6 @@
         function cancelBet(num, event) {
             if (event) event.stopPropagation();
             if(!isBettingOpen || betRecords[num] <= 0) return;
-            // 合鍵(key)を送信データに含める
             ws.send(JSON.stringify({ "request": "DoAction", "id": "cancel_" + Date.now(), "action": { "name": "BET KAKE" }, "args": { "betTarget": String(num), "betAmount": "0", "targetUser": myID, "key": myKey } }));
             betRecords[num] = 0;
             updateUIVisibility(num, 0);
@@ -193,7 +201,6 @@
             const amount = parseInt(document.getElementById('betAmount').value);
             const currentTotal = parseInt(document.getElementById('userPoints').innerText.replace(/,/g, ""));
             if (currentTotal + betRecords[selectedNum] < amount) { showPopup("ポイント不足", "pop-error", 3000); return; }
-            // 合鍵(key)を送信データに含める
             ws.send(JSON.stringify({ "request": "DoAction", "id": "bet_" + Date.now(), "action": { "name": "BET KAKE" }, "args": { "betTarget": String(selectedNum), "betAmount": String(amount), "targetUser": myID, "key": myKey } }));
         }
 

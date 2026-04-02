@@ -1,23 +1,104 @@
-<script>
-    function setPoints(val) {
-        const el = document.getElementById('pts-display');
-        if (el) el.innerText = Number(val).toLocaleString() + " 枚";
-    }
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>POGGI ROULETTE LEADERBOARD</title>
+    <style>
+        body {
+            background-color: transparent; /* OBS透過用 */
+            color: white;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+        }
+        .board {
+            width: 350px;
+            background: rgba(20, 20, 20, 0.9);
+            border: 2px solid #4ade80;
+            border-radius: 10px;
+            padding: 15px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.5);
+        }
+        h2 {
+            margin: 0 0 10px 0;
+            text-align: center;
+            color: #4ade80;
+            font-size: 1.2em;
+            border-bottom: 1px solid #4ade80;
+            padding-bottom: 5px;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        tr { border-bottom: 1px solid #333; }
+        th { text-align: left; color: #aaa; font-size: 0.8em; }
+        td { padding: 5px 2px; }
+        .rank { width: 30px; text-align: center; font-weight: bold; color: #ffd700; }
+        .name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .points { text-align: right; color: #4ade80; font-family: monospace; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="board">
+        <h2>🏆 TOP 10 RANKING</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>順位</th>
+                    <th>プレイヤー</th>
+                    <th style="text-align: right;">ポイント</th>
+                </tr>
+            </thead>
+            <tbody id="ranking-body">
+                <!-- ここにランキングが入る -->
+            </tbody>
+        </table>
+    </div>
 
-    function reloadPoints() {
-        const oldScript = document.getElementById('points-script');
-        if (oldScript) oldScript.remove();
+    <script>
+        const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
+        let ws;
 
-        const newScript = document.createElement('script');
-        newScript.id = 'points-script';
-        
-        // 【ここが重要】PC内のパスではなく、GitHubのURLを指定します
-        // 例: https://(ユーザー名).github.io/(リポジトリ名)/points.js
-        newScript.src = "https://noppogi.github.io/rust-roulette/points.js?v=" + Date.now();
-        
-        document.body.appendChild(newScript);
-    }
+        function connect() {
+            ws = new WebSocket("wss://" + NGROK_URL);
+            ws.onopen = () => {
+                // 購読開始
+                ws.send(JSON.stringify({ "request": "Subscribe", "id": "ranking", "events": { "General": ["Custom"] } }));
+                // 初回読み込み時のデータ要求
+                ws.send(JSON.stringify({ "request": "DoAction", "id": "get_rank", "action": { "name": "GetLeaderboard" } }));
+            };
 
-    setInterval(reloadPoints, 500);
-    reloadPoints();
-</script>
+            ws.onmessage = (event) => {
+                const res = JSON.parse(event.data);
+                const d = res.data || res;
+
+                if (d.type === "leaderboard") {
+                    updateBoard(d.data);
+                }
+            };
+
+            ws.onclose = () => setTimeout(connect, 3000);
+        }
+
+        function updateBoard(data) {
+            const body = document.getElementById('ranking-body');
+            body.innerHTML = "";
+            data.forEach((user, index) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="rank">${index + 1}</td>
+                    <td class="name">${user.name}</td>
+                    <td class="points">${Number(user.p).toLocaleString()}</td>
+                `;
+                body.appendChild(tr);
+            });
+        }
+
+        // 定期的に最新情報をリクエスト (30秒おき)
+        setInterval(() => {
+            if (ws && ws.readyState === 1) {
+                ws.send(JSON.stringify({ "request": "DoAction", "id": "get_rank_loop", "action": { "name": "GetLeaderboard" } }));
+            }
+        }, 30000);
+
+        connect();
+    </script>
+</body>
+</html>
