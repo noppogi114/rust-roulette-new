@@ -4,13 +4,21 @@
     <meta charset="UTF-8">
     <title>POGGI RUST ROULETTE (HYPER SYNC)</title>
     <style>
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; }
-        .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; font-family: sans-serif; }
+        .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; display: none; }
+        
+        /* ログインオーバーレイ */
+        #loginOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 1000; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        .login-card { background: #2a2a2a; padding: 40px; border-radius: 20px; border: 2px solid #4ade80; text-align: center; box-shadow: 0 0 30px rgba(74, 222, 128, 0.3); }
+        .login-card h2 { color: #4ade80; margin-bottom: 20px; font-size: 2vw; }
+        .login-card input { padding: 15px; font-size: 1.5vw; border-radius: 10px; border: none; width: 80%; margin-bottom: 20px; text-align: center; }
+        .btn-join { background: #22c55e; color: white; border: none; padding: 15px 40px; font-size: 1.5vw; font-weight: bold; border-radius: 10px; cursor: pointer; transition: 0.2s; }
+        .btn-join:hover { background: #16a34a; transform: scale(1.05); }
+
         .number-selector { position: absolute; top: 22.2%; left: 15.5%; width: 69.0%; height: 32.0%; display: flex; justify-content: space-between; align-items: center; z-index: 100; }
         .num-div { width: 16%; height: 95%; cursor: pointer; border-radius: 15px; transition: 0.2s; position: relative; }
         .num-div.selected { background: rgba(255, 255, 255, 0.4); box-shadow: 0 0 25px 10px #ffffff; border: 2px solid #ffffff; }
         
-        /* 取り消しボタンのデザイン */
         .cancel-btn {
             position: absolute;
             top: -10px;
@@ -20,7 +28,7 @@
             background: #ff4444;
             color: white;
             border-radius: 50%;
-            display: none; /* 初期状態は非表示（BETがある時だけJSで出す） */
+            display: none;
             justify-content: center;
             align-items: center;
             font-size: 20px;
@@ -43,7 +51,16 @@
     </style>
 </head>
 <body>
-    <div class="main-container">
+    <div id="loginOverlay">
+        <div class="login-card">
+            <h2>POGGI ROULETTE</h2>
+            <input type="text" id="userNameInput" placeholder="!sanka と打ってね">
+            <br>
+            <button class="btn-join" onclick="joinGame()">OK</button>
+        </div>
+    </div>
+
+    <div class="main-container" id="gameContainer">
         <div class="number-selector">
             <div class="num-div" onclick="selectNumber('1', this)">
                 <div class="cancel-btn" id="cancel-1" onclick="cancelBet('1', event)">×</div>
@@ -72,21 +89,78 @@
         <div class="status-display" id="betStatus">接続待機中</div>
         <div id="betPopup"></div>
     </div>
+
     <script>
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
-        let ws, selectedNum = "", isBettingOpen = false, popupTimer = null;
+        let ws, selectedNum = "", isBettingOpen = false, popupTimer = null, myName = "";
         let betRecords = { "1": 0, "3": 0, "5": 0, "10": 0, "20": 0 };
+
+        // --- 自動ログイン＆上書き復帰ロジック ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlUser = urlParams.get('user');
+        const savedUser = localStorage.getItem('poggi_user_name');
+
+        if (urlUser) {
+            // URLにIDがあれば優先的に保存・使用
+            myName = urlUser;
+            localStorage.setItem('poggi_user_name', myName);
+        } else if (savedUser) {
+            // URLになければ保存されたものを使用
+            myName = savedUser;
+        }
+
+        window.onload = () => {
+            if (myName) {
+                showGame();
+            } else {
+                document.getElementById('loginOverlay').style.display = 'flex';
+            }
+        };
+
+        function joinGame() {
+            const input = document.getElementById('userNameInput').value.trim();
+            if (!input) return alert("チャットで !sanka と打って届いたリンクから開いてね！");
+            myName = input;
+            localStorage.setItem('poggi_user_name', myName);
+            showGame();
+        }
+
+        function showGame() {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('gameContainer').style.display = 'block';
+            connect();
+        }
 
         function connect() {
             ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
             ws.onopen = () => { 
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "sub", "events": { "General": ["Custom"] } }));
-                ws.send(JSON.stringify({ "request": "DoAction", "id": "init", "action": { "name": "SEND_USER_POINTS" } }));
+                // 接続時に自分の最新ポイントを要求
+                ws.send(JSON.stringify({ "request": "DoAction", "id": "init", "action": { "name": "SEND_USER_POINTS" }, "args": { "targetUser": myName } }));
             };
             ws.onmessage = (event) => {
                 const res = JSON.parse(event.data);
                 const d = res.data || res;
-                if (d.p !== undefined) document.getElementById('userPoints').innerText = Number(d.p).toLocaleString();
+
+                // 自分宛のデータかチェック
+                if (d.targetUser === myName) {
+                    if (d.p !== undefined) document.getElementById('userPoints').innerText = Number(d.p).toLocaleString();
+                    
+                    ["1", "3", "5", "10", "20"].forEach(num => {
+                        const key = "b" + num;
+                        if (d[key] !== undefined) {
+                            betRecords[num] = d[key];
+                            updateUIVisibility(num, d[key]);
+                        }
+                    });
+
+                    if (d.poggi_msg !== undefined) {
+                        const isWin = d.poggi_msg.includes("当選");
+                        showPopup(d.poggi_msg, isWin ? "pop-win" : "pop-error", 6000);
+                    }
+                }
+
+                // 全員共通のステータス更新
                 if (d.is_open !== undefined) {
                     const el = document.getElementById('betStatus');
                     isBettingOpen = (d.is_open == 1 || d.is_open === true);
@@ -94,21 +168,9 @@
                     el.style.color = isBettingOpen ? "#22c55e" : "#ef4444";
                     if (!isBettingOpen) resetLocalBets();
                 }
-                ["1", "3", "5", "10", "20"].forEach(num => {
-                    const key = "b" + num;
-                    if (d[key] !== undefined) {
-                        betRecords[num] = d[key];
-                        updateUIVisibility(num, d[key]);
-                    }
-                });
-                if (d.poggi_msg !== undefined) {
-                    const isWin = d.poggi_msg.includes("当選");
-                    showPopup(d.poggi_msg, isWin ? "pop-win" : "pop-error", 6000);
-                }
             };
             ws.onclose = () => setTimeout(connect, 3000);
         }
-        connect();
 
         function selectNumber(num, element) {
             if(!isBettingOpen) return;
@@ -117,7 +179,6 @@
             element.classList.add('selected');
         }
 
-        // 表示の更新用共通関数
         function updateUIVisibility(num, amount) {
             const label = document.getElementById('bet-' + num);
             const btn = document.getElementById('cancel-' + num);
@@ -131,14 +192,14 @@
         }
 
         function cancelBet(num, event) {
-            if (event) event.stopPropagation(); // 親要素のクリックイベントを止める
+            if (event) event.stopPropagation();
             if(!isBettingOpen || betRecords[num] <= 0) return;
             
             ws.send(JSON.stringify({
                 "request": "DoAction",
                 "id": "cancel_" + Date.now(),
                 "action": { "name": "BET KAKE" },
-                "args": { "betTarget": String(num), "betAmount": "0" }
+                "args": { "betTarget": String(num), "betAmount": "0", "targetUser": myName }
             }));
             
             showPopup(num + "番を取り消しました", "", 2000);
@@ -151,15 +212,17 @@
             if(!selectedNum) { showPopup("数字を選んでね", "pop-error", 2000); return; }
             const amount = parseInt(document.getElementById('betAmount').value);
             const currentTotal = parseInt(document.getElementById('userPoints').innerText.replace(/,/g, ""));
+            
             if (currentTotal + betRecords[selectedNum] < amount) {
                 showPopup("ポイント不足", "pop-error", 3000);
                 return;
             }
+
             ws.send(JSON.stringify({
                 "request": "DoAction",
                 "id": "bet_" + Date.now(),
                 "action": { "name": "BET KAKE" },
-                "args": { "betTarget": String(selectedNum), "betAmount": String(amount) }
+                "args": { "betTarget": String(selectedNum), "betAmount": String(amount), "targetUser": myName }
             }));
             
             betRecords[selectedNum] = amount;
