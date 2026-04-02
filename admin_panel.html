@@ -11,6 +11,7 @@
         .btn-start { background: #22c55e; color: white; }
         .btn-end { background: #ef4444; color: white; }
         .btn-action { background: #3b82f6; color: white; }
+        .btn-link { background: #6366f1; color: white; text-decoration: none; display: inline-block; }
         /* 無効化時のスタイル */
         .btn:disabled { background: #555 !important; cursor: not-allowed; opacity: 0.5; }
         input:disabled { background: #333 !important; color: #777 !important; cursor: not-allowed; }
@@ -29,6 +30,7 @@
         <h2>1. 受付管理</h2>
         <button class="btn btn-start" id="btnStart" onclick="doAction('BET START')">受付開始</button>
         <button class="btn btn-end" id="btnEnd" onclick="doAction('BET END')">受付締切</button>
+        <a href="https://noppogi114.github.io/rust-roulette-new/roulette.html?user=648787629" target="_blank" class="btn btn-link">リスナー用画面を確認</a>
     </div>
 
     <div class="card">
@@ -64,8 +66,8 @@
                 log("★Streamer.botに接続成功", "success");
                 // 現在の状態を購読
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "admin_sub", "events": { "General": ["Custom"] } }));
-                // 初期化：今の受付状態を確認するためにポイント送信アクションを流用（is_openを取得するため）
-                ws.send(JSON.stringify({ "request": "DoAction", "id": "init_check", "action": { "name": "SEND_USER_POINTS" } }));
+                // 初期化：今の受付状態を確認
+                ws.send(JSON.stringify({ "request": "DoAction", "id": "init_check", "action": { "name": "SEND_USER_POINTS" }, "args": { "targetUser": "648787629" } }));
             };
             
             ws.onmessage = (event) => {
