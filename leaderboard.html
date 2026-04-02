@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <title>POGGI RANKING</title>
     <style>
-        body { background-color: #1a1a1a; color: white; font-family: sans-serif; padding: 15px; margin: 0; }
-        .board { width: 350px; background: rgba(30, 30, 30, 0.95); border: 2px solid #4ade80; border-radius: 10px; padding: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
+        body { background-color: transparent; color: white; font-family: sans-serif; padding: 10px; margin: 0; }
+        .board { width: 350px; background: rgba(20, 20, 20, 0.95); border: 2px solid #4ade80; border-radius: 10px; padding: 15px; }
         h2 { margin: 0 0 10px 0; text-align: center; color: #4ade80; border-bottom: 1px solid #4ade80; padding-bottom: 8px; font-size: 18px; }
         table { width: 100%; border-collapse: collapse; }
         tr { border-bottom: 1px solid #333; }
@@ -17,59 +17,31 @@
 <body>
     <div class="board">
         <h2>🏆 TOP 10 RANKING</h2>
-        <table>
-            <tbody id="ranking-body">
-                <tr><td colspan="3" style="text-align:center; padding: 20px;">データ受信中...</td></tr>
-            </tbody>
-        </table>
+        <table><tbody id="ranking-body"><tr><td colspan="3" style="text-align:center;">接続待機中...</td></tr></tbody></table>
     </div>
-
     <script>
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
         let ws;
-
         function connect() {
             ws = new WebSocket("wss://" + NGROK_URL);
             ws.onopen = () => {
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "ranking", "events": { "General": ["Custom"] } }));
-                setInterval(refresh, 5000);
+                setInterval(() => ws.send(JSON.stringify({ "request": "DoAction", "id": "gr", "action": { "name": "GetLeaderboard" } })), 5000);
             };
-
-            ws.onmessage = (event) => {
-                const res = JSON.parse(event.data);
-                
-                // 1. 引数(args)から直接取得 (最も確実)
-                if (res.status === "ok" && res.args && res.args.rankingJSON) {
-                    updateBoard(JSON.parse(res.args.rankingJSON));
-                    return;
-                }
-
-                // 2. 放送(Broadcast)から取得
-                if (res.data && res.data.type === "leaderboard") {
-                    updateBoard(res.data.list);
+            ws.onmessage = (e) => {
+                const res = JSON.parse(e.data);
+                const d = res.data || res;
+                if (d.type === "leaderboard" && d.data) {
+                    const body = document.getElementById('ranking-body');
+                    body.innerHTML = "";
+                    d.data.forEach((u, i) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td class="rank">${i+1}</td><td>${u.name}</td><td class="points">${u.p.toLocaleString()}</td>`;
+                        body.appendChild(tr);
+                    });
                 }
             };
             ws.onclose = () => setTimeout(connect, 3000);
-        }
-
-        function refresh() {
-            if (ws && ws.readyState === 1) {
-                ws.send(JSON.stringify({ "request": "DoAction", "id": "gr", "action": { "name": "GetLeaderboard" } }));
-            }
-        }
-
-        function updateBoard(list) {
-            const body = document.getElementById('ranking-body');
-            if (!list || list.length === 0) {
-                body.innerHTML = '<tr><td colspan="3" style="text-align:center;">参加者なし</td></tr>';
-                return;
-            }
-            body.innerHTML = "";
-            list.forEach((u, i) => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `<td class="rank">${i+1}</td><td>${u.name}</td><td class="points">${u.p.toLocaleString()}</td>`;
-                body.appendChild(tr);
-            });
         }
         connect();
     </script>
