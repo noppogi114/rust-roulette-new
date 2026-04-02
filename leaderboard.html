@@ -28,17 +28,18 @@
             
             ws.onopen = () => {
                 document.getElementById('st').innerText = "🏆 RANKING (CONNECTED)";
-                // WebSocket購読
+                // WebSocket購読（これが無いとリアルタイム放送が届きません）
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "ranking", "events": { "General": ["Custom"] } }));
                 
-                // 【修正点1】ページを開いた瞬間に最新ランキングを生成させる
+                // ページを開いた瞬間に最新ランキングを生成させる
                 ws.send(JSON.stringify({
                     "request": "DoAction",
                     "id": "init_ranking",
                     "action": { "name": "GetLeaderboard" }
                 }));
 
-                // 【修正点2】5秒おきに変数を直接チェック（バックアップ用）
+                // 定期チェック（F5の代わりのバックアップ）
+                // 5秒だと頻繁すぎる場合は10〜30秒でもOKです
                 setInterval(() => {
                     if(ws.readyState === WebSocket.OPEN) {
                         ws.send(JSON.stringify({ 
@@ -48,50 +49,57 @@
                             "persisted": true 
                         }));
                     }
-                }, 5000);
+                }, 10000); // 10秒に1回に調整
             };
 
             ws.onmessage = (e) => {
                 const res = JSON.parse(e.data);
                 let list = null;
 
-                // 1. 変数の直接取得に対する返答の処理
-                // Streamer.bot v1.0.4では res.variables[変数名] に値が入ります
+                // 1. 変数の直接取得 (GetGlobalVariable) に対する処理
                 if (res.id === "gr" && res.status === "ok" && res.variables) {
                     const rawVal = res.variables.current_leaderboard_json;
                     if (rawVal) {
                         list = typeof rawVal === 'string' ? JSON.parse(rawVal) : rawVal;
                     }
                 } 
-                // 2. 放送(Broadcast)に対する処理
-                else if (res.data && res.data.type === "leaderboard") {
-                    list = res.data.data;
+                // 2. 放送 (Broadcast) に対する処理（ここがリアルタイム更新の肝）
+                // data.type または type どちらでも受け取れるようにガードを強化
+                else {
+                    const d = res.data || res;
+                    if (d.type === "leaderboard") {
+                        list = d.data;
+                    }
                 }
 
                 // リストが存在すれば表示を更新
                 if (list && Array.isArray(list)) {
-                    const body = document.getElementById('ranking-body');
-                    body.innerHTML = "";
-                    if (list.length === 0) {
-                        body.innerHTML = '<tr><td colspan="3" style="text-align:center;">データがありません</td></tr>';
-                        return;
-                    }
-                    list.forEach((u, i) => {
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td class="rank">${i+1}</td>
-                            <td>${u.name}</td>
-                            <td class="points">${Number(u.p).toLocaleString()}</td>
-                        `;
-                        body.appendChild(tr);
-                    });
+                    updateUI(list);
                 }
             };
 
             ws.onclose = () => {
-                document.getElementById('st').innerText = "🏆 RANKING (DISCONNECTED)";
+                document.getElementById('st').innerText = "🏆 RANKING (RECONNECTING...)";
                 setTimeout(connect, 3000);
             };
+        }
+
+        function updateUI(list) {
+            const body = document.getElementById('ranking-body');
+            body.innerHTML = "";
+            if (list.length === 0) {
+                body.innerHTML = '<tr><td colspan="3" style="text-align:center;">データがありません</td></tr>';
+                return;
+            }
+            list.forEach((u, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td class="rank">${i+1}</td>
+                    <td>${u.name}</td>
+                    <td class="points">${Number(u.p).toLocaleString()}</td>
+                `;
+                body.appendChild(tr);
+            });
         }
 
         connect();
