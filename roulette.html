@@ -139,7 +139,7 @@
             ws.onopen = () => { 
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "sub", "events": { "General": ["Custom"] } }));
                 
-                // ★追加：ログイン時に名前をボットのアクション「SaveUserName」へ送る
+                // 名前保存とポイント取得
                 ws.send(JSON.stringify({ 
                     "request": "DoAction", 
                     "id": "save_name", 
@@ -147,13 +147,24 @@
                     "args": { "targetUser": myID, "userName": myNick } 
                 }));
 
-                ws.send(JSON.stringify({ "request": "DoAction", "id": "init", "action": { "name": "SEND_USER_POINTS" }, "args": { "targetUser": myID, "key": myKey } }));
+                ws.send(JSON.stringify({ 
+                    "request": "DoAction", 
+                    "id": "init", 
+                    "action": { "name": "SEND_USER_POINTS" }, 
+                    "args": { "targetUser": myID, "key": myKey } 
+                }));
             };
+
             ws.onmessage = (event) => {
                 const res = JSON.parse(event.data);
                 const d = res.data || res;
+
+                // 自分宛のデータ処理
                 if (d.targetUser === myID) {
+                    // 所持ポイント更新
                     if (d.p !== undefined) document.getElementById('userPoints').innerText = Number(d.p).toLocaleString();
+                    
+                    // BET状況の更新 (b1, b3, b5, b10, b20)
                     ["1", "3", "5", "10", "20"].forEach(num => {
                         const key = "b" + num;
                         if (d[key] !== undefined) {
@@ -161,14 +172,23 @@
                             updateUIVisibility(num, d[key]);
                         }
                     });
+
+                    // メッセージポップアップ
                     if (d.poggi_msg !== undefined) showPopup(d.poggi_msg, d.poggi_msg.includes("当選") ? "pop-win" : "pop-error", 6000);
                 }
+
+                // 受付状態の更新 (放送)
                 if (d.is_open !== undefined) {
                     isBettingOpen = (d.is_open == 1 || d.is_open === true);
                     const el = document.getElementById('betStatus');
                     el.innerText = isBettingOpen ? "受付開始" : "受付終了";
                     el.style.color = isBettingOpen ? "#22c55e" : "#ef4444";
-                    if (!isBettingOpen) resetLocalBets();
+                    
+                    // 受付終了時、または新しい受付開始時にローカル表示をリセットしたい場合はここ
+                    // ただし「当選確定まで残したい」なら isOpen === true の時だけリセット
+                    if (isBettingOpen) {
+                         resetLocalBets();
+                    }
                 }
             };
             ws.onclose = () => setTimeout(connect, 3000);
@@ -184,24 +204,39 @@
         function updateUIVisibility(num, amount) {
             const label = document.getElementById('bet-' + num);
             const btn = document.getElementById('cancel-' + num);
-            label.innerText = amount > 0 ? amount + " jobo" : "";
-            btn.style.display = amount > 0 ? "flex" : "none";
+            if (label) label.innerText = amount > 0 ? amount + " jobo" : "";
+            if (btn) btn.style.display = amount > 0 ? "flex" : "none";
         }
 
         function cancelBet(num, event) {
             if (event) event.stopPropagation();
             if(!isBettingOpen || betRecords[num] <= 0) return;
-            ws.send(JSON.stringify({ "request": "DoAction", "id": "cancel_" + Date.now(), "action": { "name": "BET KAKE" }, "args": { "betTarget": String(num), "betAmount": "0", "targetUser": myID, "key": myKey } }));
-            betRecords[num] = 0;
-            updateUIVisibility(num, 0);
+            ws.send(JSON.stringify({ 
+                "request": "DoAction", 
+                "id": "cancel_" + Date.now(), 
+                "action": { "name": "BET KAKE" }, 
+                "args": { "betTarget": String(num), "betAmount": "0", "targetUser": myID, "key": myKey } 
+            }));
         }
 
         function executeBet() {
             if(!isBettingOpen || !selectedNum) return;
-            const amount = parseInt(document.getElementById('betAmount').value);
+            const amountInput = document.getElementById('betAmount').value;
+            const amount = parseInt(amountInput);
+            if (isNaN(amount) || amount <= 0) return;
+
             const currentTotal = parseInt(document.getElementById('userPoints').innerText.replace(/,/g, ""));
-            if (currentTotal + betRecords[selectedNum] < amount) { showPopup("ポイント不足", "pop-error", 3000); return; }
-            ws.send(JSON.stringify({ "request": "DoAction", "id": "bet_" + Date.now(), "action": { "name": "BET KAKE" }, "args": { "betTarget": String(selectedNum), "betAmount": String(amount), "targetUser": myID, "key": myKey } }));
+            if (currentTotal + betRecords[selectedNum] < amount) { 
+                showPopup("ポイント不足", "pop-error", 3000); 
+                return; 
+            }
+
+            ws.send(JSON.stringify({ 
+                "request": "DoAction", 
+                "id": "bet_" + Date.now(), 
+                "action": { "name": "BET KAKE" }, 
+                "args": { "betTarget": String(selectedNum), "betAmount": String(amount), "targetUser": myID, "key": myKey } 
+            }));
         }
 
         function resetLocalBets() {
