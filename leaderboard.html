@@ -2,17 +2,15 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <title>POGGI ROULETTE LEADERBOARD</title>
+    <title>POGGI RANKING</title>
     <style>
         body { background-color: #1a1a1a; color: white; font-family: sans-serif; padding: 15px; margin: 0; }
         .board { width: 350px; background: rgba(30, 30, 30, 0.95); border: 2px solid #4ade80; border-radius: 10px; padding: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
         h2 { margin: 0 0 10px 0; text-align: center; color: #4ade80; border-bottom: 1px solid #4ade80; padding-bottom: 8px; font-size: 18px; }
         table { width: 100%; border-collapse: collapse; }
         tr { border-bottom: 1px solid #333; }
-        th { text-align: left; color: #888; font-size: 11px; padding: 5px; }
-        td { padding: 8px 5px; font-size: 14px; }
+        td { padding: 8px 5px; font-size: 15px; }
         .rank { width: 35px; text-align: center; font-weight: bold; color: #ffd700; }
-        .name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .points { text-align: right; color: #4ade80; font-family: monospace; font-weight: bold; }
     </style>
 </head>
@@ -20,11 +18,8 @@
     <div class="board">
         <h2>🏆 TOP 10 RANKING</h2>
         <table>
-            <thead>
-                <tr><th>位</th><th>プレイヤー</th><th style="text-align: right;">ポイント</th></tr>
-            </thead>
             <tbody id="ranking-body">
-                <tr><td colspan="3" style="text-align:center; padding: 20px;">データ受信待機中...</td></tr>
+                <tr><td colspan="3" style="text-align:center; padding: 20px;">データ受信中...</td></tr>
             </tbody>
         </table>
     </div>
@@ -37,52 +32,45 @@
             ws = new WebSocket("wss://" + NGROK_URL);
             ws.onopen = () => {
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "ranking", "events": { "General": ["Custom"] } }));
-                refresh();
+                setInterval(refresh, 5000);
             };
 
             ws.onmessage = (event) => {
                 const res = JSON.parse(event.data);
-                console.log("Raw Data:", res);
+                
+                // 1. 引数(args)から直接取得 (最も確実)
+                if (res.status === "ok" && res.args && res.args.rankingJSON) {
+                    updateBoard(JSON.parse(res.args.rankingJSON));
+                    return;
+                }
 
-                // 文字列として検索して leaderboard 判定
-                const rawString = event.data;
-                if (rawString.includes('"type":"leaderboard"')) {
-                    // 階層に関わらず、中にある list 配列を探し出す
-                    const findList = (obj) => {
-                        if (obj.list) return obj.list;
-                        if (obj.data && obj.data.list) return obj.data.list;
-                        if (typeof obj.data === 'object') return findList(obj.data);
-                        return null;
-                    };
-                    const list = findList(res);
-                    if (list) updateBoard(list);
+                // 2. 放送(Broadcast)から取得
+                if (res.data && res.data.type === "leaderboard") {
+                    updateBoard(res.data.list);
                 }
             };
-
             ws.onclose = () => setTimeout(connect, 3000);
         }
 
         function refresh() {
             if (ws && ws.readyState === 1) {
-                ws.send(JSON.stringify({ "request": "DoAction", "id": "get_rank", "action": { "name": "GetLeaderboard" } }));
+                ws.send(JSON.stringify({ "request": "DoAction", "id": "gr", "action": { "name": "GetLeaderboard" } }));
             }
         }
 
         function updateBoard(list) {
             const body = document.getElementById('ranking-body');
+            if (!list || list.length === 0) {
+                body.innerHTML = '<tr><td colspan="3" style="text-align:center;">参加者なし</td></tr>';
+                return;
+            }
             body.innerHTML = "";
-            list.forEach((user, index) => {
+            list.forEach((u, i) => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="rank">${index + 1}</td>
-                    <td class="name">${user.name}</td>
-                    <td class="points">${Number(user.p).toLocaleString()}</td>
-                `;
+                tr.innerHTML = `<td class="rank">${i+1}</td><td>${u.name}</td><td class="points">${u.p.toLocaleString()}</td>`;
                 body.appendChild(tr);
             });
         }
-
-        setInterval(refresh, 5000); // 5秒おきにリクエスト
         connect();
     </script>
 </body>
