@@ -4,13 +4,13 @@
     <meta charset="UTF-8">
     <title>POGGI ROULETTE LEADERBOARD</title>
     <style>
-        body { background-color: transparent; color: white; font-family: sans-serif; overflow: hidden; }
+        body { background-color: transparent; color: white; font-family: sans-serif; overflow: hidden; margin: 0; padding: 10px; }
         .board { width: 350px; background: rgba(20, 20, 20, 0.95); border: 2px solid #4ade80; border-radius: 10px; padding: 15px; }
-        h2 { margin: 0 0 10px 0; text-align: center; color: #4ade80; border-bottom: 1px solid #4ade80; padding-bottom: 5px; }
+        h2 { margin: 0 0 10px 0; text-align: center; color: #4ade80; border-bottom: 1px solid #4ade80; padding-bottom: 5px; font-size: 18px; }
         table { width: 100%; border-collapse: collapse; }
         tr { border-bottom: 1px solid #333; }
-        th { text-align: left; color: #aaa; font-size: 12px; }
-        td { padding: 8px 2px; font-size: 14px; }
+        th { text-align: left; color: #aaa; font-size: 12px; padding: 5px; }
+        td { padding: 8px 5px; font-size: 14px; }
         .rank { width: 40px; text-align: center; font-weight: bold; color: #ffd700; }
         .name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .points { text-align: right; color: #4ade80; font-family: monospace; font-weight: bold; }
@@ -36,19 +36,18 @@
         function connect() {
             ws = new WebSocket("wss://" + NGROK_URL);
             ws.onopen = () => {
-                console.log("Ranking connected!");
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "ranking", "events": { "General": ["Custom"] } }));
-                // 即座にデータを要求
                 refresh();
             };
 
             ws.onmessage = (event) => {
                 const res = JSON.parse(event.data);
-                // データの場所を特定 (res.data.data または res.data)
+                // ボットからのデータを解析 (あらゆる階層をチェック)
                 const d = res.data || res;
-
-                if (d.type === "leaderboard" && d.data) {
-                    updateBoard(d.data);
+                
+                if (d.type === "leaderboard") {
+                    const list = d.list || d.data; // 両方のパターンに対応
+                    if (list) updateBoard(list);
                 }
             };
 
@@ -61,14 +60,14 @@
             }
         }
 
-        function updateBoard(data) {
+        function updateBoard(list) {
             const body = document.getElementById('ranking-body');
-            if (data.length === 0) {
-                body.innerHTML = '<tr><td colspan="3" style="text-align:center;">まだ参加者がいません</td></tr>';
+            if (!list || list.length === 0) {
+                body.innerHTML = '<tr><td colspan="3" style="text-align:center;">参加者がいません</td></tr>';
                 return;
             }
             body.innerHTML = "";
-            data.forEach((user, index) => {
+            list.forEach((user, index) => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="rank">${index + 1}</td>
@@ -79,8 +78,7 @@
             });
         }
 
-        // 30秒おきに最新化
-        setInterval(refresh, 30000);
+        setInterval(refresh, 10000); // 10秒おきに更新
         connect();
     </script>
 </body>
