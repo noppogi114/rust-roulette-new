@@ -65,7 +65,6 @@
         let ws, selectedNum = "", isBettingOpen = false, popupTimer = null, myID = "", myNick = "";
         let betRecords = { "1": 0, "3": 0, "5": 0, "10": 0, "20": 0 };
 
-        // URLから数字IDを取得し、保存されているニックネームを読み込む
         const urlParams = new URLSearchParams(window.location.search);
         const urlID = urlParams.get('user');
         const savedID = localStorage.getItem('poggi_user_id');
@@ -103,7 +102,8 @@
         }
 
         function connect() {
-            ws = new WebSocket("wss://" + NGROK_URL + "/streamerbot");
+            // エンドポイント修正: ngrokの転送先がすでに /streamerbot なので、ここでは末尾を空にする
+            ws = new WebSocket("wss://" + NGROK_URL);
             ws.onopen = () => { 
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "sub", "events": { "General": ["Custom"] } }));
                 ws.send(JSON.stringify({ "request": "DoAction", "id": "init", "action": { "name": "SEND_USER_POINTS" }, "args": { "targetUser": myID } }));
