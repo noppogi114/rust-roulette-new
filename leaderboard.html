@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>POGGI ROULETTE LEADERBOARD</title>
     <style>
-        body { background-color: #1a1a1a; color: white; font-family: sans-serif; padding: 20px; }
+        body { background-color: #1a1a1a; color: white; font-family: sans-serif; padding: 20px; margin: 0; }
         .board { width: 350px; background: rgba(30, 30, 30, 0.95); border: 2px solid #4ade80; border-radius: 10px; padding: 15px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
         h2 { margin: 0 0 10px 0; text-align: center; color: #4ade80; border-bottom: 1px solid #4ade80; padding-bottom: 8px; font-size: 20px; }
         table { width: 100%; border-collapse: collapse; }
@@ -13,8 +13,7 @@
         td { padding: 10px 5px; font-size: 15px; }
         .rank { width: 40px; text-align: center; font-weight: bold; color: #ffd700; }
         .name { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #eee; }
-        .points { text-align: right; color: #4ade80; font-family: 'Courier New', Courier, monospace; font-weight: bold; }
-        .debug-msg { font-size: 10px; color: #555; margin-top: 10px; text-align: center; }
+        .points { text-align: right; color: #4ade80; font-family: monospace; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -28,7 +27,6 @@
                 <tr><td colspan="3" style="text-align:center; padding: 20px;">接続中...</td></tr>
             </tbody>
         </table>
-        <div id="debug" class="debug-msg">ボットからの信号を待機中...</div>
     </div>
 
     <script>
@@ -38,34 +36,28 @@
         function connect() {
             ws = new WebSocket("wss://" + NGROK_URL);
             ws.onopen = () => {
-                document.getElementById('debug').innerText = "接続成功：データを要求中...";
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "ranking", "events": { "General": ["Custom"] } }));
                 refresh();
             };
 
             ws.onmessage = (event) => {
                 const res = JSON.parse(event.data);
-                const d = res.data || res;
+                console.log("受信データ:", res); // コンソールで中身を確認
                 
-                // デバッグ用ログ
-                console.log("受信データ:", d);
+                // あらゆる階層から type: "leaderboard" を探す
+                const findData = (obj) => {
+                    if (obj.type === "leaderboard") return obj.list || obj.data;
+                    if (obj.data) return findData(obj.data);
+                    return null;
+                };
 
-                if (d.type === "leaderboard") {
-                    // data か list のどちらかにある配列を探す
-                    const rankingData = d.list || d.data;
-                    if (rankingData && Array.isArray(rankingData)) {
-                        updateBoard(rankingData);
-                        document.getElementById('debug').innerText = "最終更新: " + new Date().toLocaleTimeString();
-                    } else {
-                        document.getElementById('debug').innerText = "エラー：データ構造が不正です";
-                    }
+                const rankingList = findData(res);
+                if (rankingList) {
+                    updateBoard(rankingList);
                 }
             };
 
-            ws.onclose = () => {
-                document.getElementById('debug').innerText = "接続切れ：再接続します...";
-                setTimeout(connect, 3000);
-            };
+            ws.onclose = () => setTimeout(connect, 3000);
         }
 
         function refresh() {
@@ -76,28 +68,19 @@
 
         function updateBoard(list) {
             const body = document.getElementById('ranking-body');
-            if (list.length === 0) {
-                body.innerHTML = '<tr><td colspan="3" style="text-align:center; padding: 20px;">まだデータがありません</td></tr>';
-                return;
-            }
             body.innerHTML = "";
             list.forEach((user, index) => {
-                // name または Name、p または Points のどちらでも対応できるようにする
-                const displayName = user.name || user.Name || "不明";
-                const displayPoints = (user.p !== undefined) ? user.p : (user.Points || 0);
-
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td class="rank">${index + 1}</td>
-                    <td class="name">${displayName}</td>
-                    <td class="points">${Number(displayPoints).toLocaleString()}</td>
+                    <td class="name">${user.name || user.Name}</td>
+                    <td class="points">${Number(user.p || user.Points).toLocaleString()}</td>
                 `;
                 body.appendChild(tr);
             });
         }
 
-        // 10秒おきに自動更新
-        setInterval(refresh, 10000);
+        setInterval(refresh, 10000); // 10秒更新
         connect();
     </script>
 </body>
