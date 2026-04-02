@@ -27,14 +27,26 @@
             ws = new WebSocket("wss://" + NGROK_URL);
             
             ws.onopen = () => {
-                // 接続できたらタイトルを更新
                 document.getElementById('st').innerText = "🏆 RANKING (CONNECTED)";
+                // WebSocket購読
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "ranking", "events": { "General": ["Custom"] } }));
                 
-                // 5秒おきに最新の変数をボットに問い合わせる
+                // 【修正点1】ページを開いた瞬間に最新ランキングを生成させる
+                ws.send(JSON.stringify({
+                    "request": "DoAction",
+                    "id": "init_ranking",
+                    "action": { "name": "GetLeaderboard" }
+                }));
+
+                // 【修正点2】5秒おきに変数を直接チェック（バックアップ用）
                 setInterval(() => {
                     if(ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({ "request": "GetGlobalVariable", "id": "gr", "variable": "current_leaderboard_json", "persisted": true }));
+                        ws.send(JSON.stringify({ 
+                            "request": "GetGlobalVariable", 
+                            "id": "gr", 
+                            "variable": "current_leaderboard_json", 
+                            "persisted": true 
+                        }));
                     }
                 }, 5000);
             };
@@ -43,19 +55,27 @@
                 const res = JSON.parse(e.data);
                 let list = null;
 
-                // 1. 変数の問い合わせ(GetGlobalVariable)に対する返信をチェック
-                if (res.id === "gr" && res.status === "ok" && res.value) {
-                    list = typeof res.value === 'string' ? JSON.parse(res.value) : res.value;
+                // 1. 変数の直接取得に対する返答の処理
+                // Streamer.bot v1.0.4では res.variables[変数名] に値が入ります
+                if (res.id === "gr" && res.status === "ok" && res.variables) {
+                    const rawVal = res.variables.current_leaderboard_json;
+                    if (rawVal) {
+                        list = typeof rawVal === 'string' ? JSON.parse(rawVal) : rawVal;
+                    }
                 } 
-                // 2. 放送(broadcast)をチェック
+                // 2. 放送(Broadcast)に対する処理
                 else if (res.data && res.data.type === "leaderboard") {
                     list = res.data.data;
                 }
 
-                // リストが存在すれば画面を更新
+                // リストが存在すれば表示を更新
                 if (list && Array.isArray(list)) {
                     const body = document.getElementById('ranking-body');
                     body.innerHTML = "";
+                    if (list.length === 0) {
+                        body.innerHTML = '<tr><td colspan="3" style="text-align:center;">データがありません</td></tr>';
+                        return;
+                    }
                     list.forEach((u, i) => {
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
@@ -69,7 +89,7 @@
             };
 
             ws.onclose = () => {
-                document.getElementById('st').innerText = "🏆 RANKING (RECONNECTING...)";
+                document.getElementById('st').innerText = "🏆 RANKING (DISCONNECTED)";
                 setTimeout(connect, 3000);
             };
         }
