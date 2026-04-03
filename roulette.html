@@ -5,34 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>POGGI RUST ROULETTE (HYPER SYNC)</title>
     <style>
-        /* 全体のレイアウト設定 */
-        body, html { 
-            margin: 0; padding: 0; width: 100%; height: 100%; 
-            background-color: #000; overflow: hidden; 
-            display: flex; justify-content: center; align-items: center; 
-            font-family: sans-serif; 
-        }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; font-family: sans-serif; }
         
         /* 
-           【スマホ対策】 
-           画面サイズに合わせて、16:9の比率を保ったまま最大化します。
-           aspect-ratio を使うことで、左右が縮まるのを防ぎます。
+           【PC・スマホ両対応の決定版】
+           PCでは画面いっぱいに広がり（100vw/100vh）、
+           スマホなどの縦長画面では16:9の比率を維持して画像が潰れるのを防ぎます。
         */
         .main-container { 
             position: relative; 
             width: 100vw; 
-            height: 56.25vw; /* 16:9 の比率 (9 / 16 = 0.5625) */
-            max-height: 100vh; 
-            max-width: 177.78vh; /* 16:9 の比率 (16 / 9 = 1.7778) */
+            height: 100vh; 
+            /* スマホで画像が縦に潰れないように比率を強制維持 */
+            max-height: 56.25vw; 
             background-image: url('main_bg.png?v=2'); 
-            background-size: contain; /* 縮ませずに枠内に収める */
+            background-size: 100% 100%; 
             background-position: center; 
             background-repeat: no-repeat; 
             display: block; 
         }
 
-        /* 各要素の配置（vw/vhを使っているので比率が維持されます） */
-        .user-badge { position: absolute; top: 2%; left: 2%; background: rgba(0, 0, 0, 0.7); color: #4ade80; padding: 0.8vw 1.5vw; border-radius: 30px; font-size: 1.2vw; font-weight: bold; border: 1px solid #4ade80; z-index: 200; display: flex; align-items: center; gap: 0.5vw; }
+        /* PCのような横長画面（16:9以上）の場合は、高さを100vhに固定して黒帯を消す */
+        @media (min-aspect-ratio: 16/9) {
+            .main-container {
+                max-height: 100vh;
+            }
+        }
+
+        .user-badge { position: absolute; top: 2%; left: 2%; background: rgba(0, 0, 0, 0.7); color: #4ade80; padding: 10px 20px; border-radius: 30px; font-size: 1.2vw; font-weight: bold; border: 1px solid #4ade80; z-index: 200; display: flex; align-items: center; gap: 10px; }
         .user-badge::before { content: "●"; color: #22c55e; animation: blink 2s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
@@ -42,7 +42,7 @@
         .num-div { width: 16%; height: 95%; cursor: pointer; border-radius: 15px; transition: 0.2s; position: relative; }
         .num-div.selected { background: rgba(255, 255, 255, 0.4); box-shadow: 0 0 25px 10px #ffffff; border: 2px solid #ffffff; }
         
-        .cancel-btn { position: absolute; top: -1vw; right: -1vw; width: 2.5vw; height: 2.5vw; background: #ff4444; color: white; border-radius: 50%; display: none; justify-content: center; align-items: center; font-size: 1.5vw; font-weight: bold; box-shadow: 0 0 10px rgba(0,0,0,0.5); border: 2px solid #fff; z-index: 120; cursor: pointer; }
+        .cancel-btn { position: absolute; top: -10px; right: -10px; width: 35px; height: 35px; background: #ff4444; color: white; border-radius: 50%; display: none; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; box-shadow: 0 0 10px rgba(0,0,0,0.5); border: 2px solid #fff; z-index: 120; cursor: pointer; }
         .final-bet-div { position: absolute; top: 55.5%; left: 44.5%; width: 11.5%; height: 25.0%; cursor: pointer; z-index: 110; }
         .input-amount { position: absolute; top: 62.5%; left: 5%; width: 24.0%; height: 4.5%; background: transparent; border: none; outline: none; color: #ffffff; font-size: 2.5vw; text-align: right; padding-right: 5%; font-weight: bold; z-index: 110; }
         
@@ -50,9 +50,9 @@
         .refresh-trigger { position: absolute; top: 74.5%; left: 35.5%; width: 4.0%; height: 6.0%; cursor: pointer; z-index: 150; }
 
         .status-display { position: absolute; top: 89.0%; left: 57.0%; width: 30%; height: 6%; display: flex; align-items: center; font-size: 2.2vw; font-weight: bold; text-shadow: 2px 2px 4px #000; }
-        .bet-label { position: absolute; bottom: -2vw; left: 0; width: 100%; text-align: center; color: #ffd700; font-size: 1.5vw; font-weight: bold; text-shadow: 2px 2px 2px #000; pointer-events: none; white-space: nowrap; }
+        .bet-label { position: absolute; bottom: -25px; left: 0; width: 100%; text-align: center; color: #ffd700; font-size: 1.5vw; font-weight: bold; text-shadow: 2px 2px 2px #000; pointer-events: none; white-space: nowrap; }
         
-        #betPopup { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.95); padding: 2vw 4vw; border-radius: 15px; font-size: 2.8vw; font-weight: bold; z-index: 999; display: none; text-shadow: 2px 2px 4px #000; white-space: nowrap; border: 4px solid #ffd700; color: #ffd700; }
+        #betPopup { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.95); padding: 30px 60px; border-radius: 15px; font-size: 2.8vw; font-weight: bold; z-index: 999; display: none; text-shadow: 2px 2px 4px #000; white-space: nowrap; border: 4px solid #ffd700; color: #ffd700; }
         .popup-close { position: absolute; top: 5px; right: 15px; color: white; font-size: 2vw; cursor: pointer; opacity: 0.6; }
         .popup-close:hover { opacity: 1; }
     </style>
@@ -102,7 +102,6 @@
             myID = urlID || localStorage.getItem('poggi_user_id');
             myKey = urlKey || localStorage.getItem('poggi_user_key');
             myNick = localStorage.getItem('poggi_user_nick') || "GUEST";
-
             if (urlID && urlKey) {
                 localStorage.setItem('poggi_user_id', myID);
                 localStorage.setItem('poggi_user_key', myKey);
@@ -121,12 +120,7 @@
             ws = new WebSocket("wss://" + NGROK_URL);
             ws.onopen = () => { 
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "sub", "events": { "General": ["Custom"] } }));
-                ws.send(JSON.stringify({ 
-                    "request": "DoAction", 
-                    "id": "save_name", 
-                    "action": { "name": "SaveUserName" }, 
-                    "args": { "targetUser": myID, "userName": myNick } 
-                }));
+                ws.send(JSON.stringify({ "request": "DoAction", "id": "save_name", "action": { "name": "SaveUserName" }, "args": { "targetUser": myID, "userName": myNick } }));
                 manualRefresh();
             };
 
@@ -157,12 +151,7 @@
 
         function manualRefresh() {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ 
-                    "request": "DoAction", 
-                    "id": "refresh_req", 
-                    "action": { "name": "SEND_USER_POINTS" }, 
-                    "args": { "targetUser": myID, "key": myKey } 
-                }));
+                ws.send(JSON.stringify({ "request": "DoAction", "id": "refresh_req", "action": { "name": "SEND_USER_POINTS" }, "args": { "targetUser": myID, "key": myKey } }));
             }
         }
 
