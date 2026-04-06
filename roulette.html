@@ -16,7 +16,7 @@
             background-size: 100% 100%; 
             background-position: center; 
             background-repeat: no-repeat; 
-            display: none; 
+            display: none; /* 初期状態は非表示、名前確定後に表示 */
         }
 
         @media (min-aspect-ratio: 16/9) {
@@ -25,6 +25,7 @@
             }
         }
 
+        /* 名前入力オーバーレイ */
         #loginOverlay { 
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
@@ -145,6 +146,7 @@
                 localStorage.setItem('poggi_user_key', myKey);
             }
 
+            // 名前の有無で初期表示を分岐
             if (!myNick || myNick === "GUEST" || myNick === "----") {
                 showLogin();
             } else {
@@ -179,6 +181,7 @@
             ws = new WebSocket("wss://" + NGROK_URL);
             ws.onopen = () => { 
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "sub", "events": { "General": ["Custom"] } }));
+                // 接続時に名前をボットに送信
                 ws.send(JSON.stringify({ "request": "DoAction", "id": "save_name", "action": { "name": "SaveUserName" }, "args": { "targetUser": myID, "userName": myNick } }));
                 manualRefresh();
             };
@@ -187,7 +190,7 @@
                 const res = JSON.parse(event.data);
                 const d = res.data || res;
                 if (d.targetUser === myID) {
-                    // ★重要：ボット側の名前変数が空の場合、ブラウザの保存を消してリロード
+                    // ★重要：ボット側の名前が空っぽ（消去された）なら、ブラウザの記憶を消してリロード
                     if (d.name === "") {
                         localStorage.removeItem('poggi_user_nick');
                         location.reload();
