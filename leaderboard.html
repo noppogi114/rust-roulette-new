@@ -13,8 +13,9 @@
             border: 2px solid #4ade80; 
             border-radius: 10px; 
             padding: 15px; 
-            transition: 0.5s; /* 演出用に変化をなめらかに */
+            transition: 0.5s;
             position: relative;
+            margin-top: 40px; /* パトライト用のスペース */
         }
 
         /* ボーナス発生時の黄金エフェクト */
@@ -22,6 +23,32 @@
             border-color: #ffd700;
             box-shadow: 0 0 30px #ffd700;
             transform: scale(1.05);
+        }
+
+        /* --- パトライト演出 --- */
+        #patrol-light {
+            position: absolute;
+            top: -35px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 60px;
+            height: 40px;
+            background: #440000; /* 通常時は暗い赤 */
+            border-radius: 25px 25px 5px 5px;
+            display: none;
+            z-index: 110;
+        }
+
+        /* パトライト回転点滅アニメーション */
+        .rotating #patrol-light {
+            display: block;
+            animation: patrol-glow 0.15s infinite;
+        }
+
+        @keyframes patrol-glow {
+            0% { background: #ff0000; box-shadow: 0 0 10px #ff0000, 0 0 40px #ff0000; }
+            50% { background: #ffaaaa; box-shadow: 0 0 20px #ff0000, 0 0 80px #ff0000; }
+            100% { background: #ff0000; box-shadow: 0 0 10px #ff0000, 0 0 40px #ff0000; }
         }
 
         h2 { margin: 0 0 10px 0; text-align: center; color: #4ade80; border-bottom: 1px solid #4ade80; padding-bottom: 8px; font-size: 18px; transition: 0.3s; }
@@ -39,17 +66,18 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%) scale(0);
-            background: rgba(255, 215, 0, 0.9);
+            background: linear-gradient(45deg, #ffd700, #fff);
             color: black;
-            padding: 10px 20px;
+            padding: 15px 30px;
             border-radius: 50px;
             font-weight: bold;
-            font-size: 24px;
+            font-size: 28px;
             white-space: nowrap;
             z-index: 100;
             opacity: 0;
             transition: 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             pointer-events: none;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
         }
         #bonus-alert.show {
             transform: translate(-50%, -50%) scale(1.2);
@@ -59,8 +87,11 @@
 </head>
 <body>
     <div class="board" id="main-board">
+        <!-- パトライト本体 -->
+        <div id="patrol-light"></div>
+
         <!-- ボーナス時の飛び出す文字 -->
-        <div id="bonus-alert">💰 BONUS +1000pt</div>
+        <div id="bonus-alert">🚨 KYU-IN! +1000pt</div>
 
         <h2 id="st">🏆 TOP 10 RANKING</h2>
         <table><tbody id="ranking-body"><tr><td colspan="3" style="text-align:center;">接続待機中...</td></tr></tbody></table>
@@ -69,6 +100,9 @@
     <script>
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
         let ws;
+
+        // 効果音の読み込み (Googleの短いアラーム音を仮セット)
+        const kyuInSound = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
 
         function connect() {
             ws = new WebSocket("wss://" + NGROK_URL);
@@ -100,8 +134,7 @@
                 let list = null;
                 const d = res.data || res;
 
-                // --- ★ボーナス通知の受信処理 ---
-                // poggi_msg が届いたときに演出を実行
+                // ボーナス通知の受信処理
                 if (d.poggi_msg && d.poggi_msg.includes("ボーナス")) {
                     triggerBonusVisual();
                 }
@@ -127,19 +160,26 @@
             };
         }
 
-        // --- ★ボーナス視覚演出の関数 ---
+        // --- パトライト＆効果音＆視覚演出の実行 ---
         function triggerBonusVisual() {
             const board = document.getElementById('main-board');
             const alert = document.getElementById('bonus-alert');
 
+            // 音を鳴らす
+            kyuInSound.currentTime = 0;
+            kyuInSound.play().catch(e => console.log("Audio play blocked"));
+
+            // クラス付与 (パトライト回転とボード発光)
+            document.body.classList.add('rotating');
             board.classList.add('bonus-active');
             alert.classList.add('show');
 
-            // 3秒後にエフェクトを消す
+            // 4秒後に演出を終了
             setTimeout(() => {
+                document.body.classList.remove('rotating');
                 board.classList.remove('bonus-active');
                 alert.classList.remove('show');
-            }, 3000);
+            }, 4000);
         }
 
         function updateUI(list) {
