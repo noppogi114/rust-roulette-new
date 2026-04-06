@@ -7,36 +7,67 @@
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; font-family: sans-serif; }
         
-        /* 
-           【PC・スマホ両対応の決定版】
-           PCでは画面いっぱいに広がり（100vw/100vh）、
-           スマホなどの縦長画面では16:9の比率を維持して画像が潰れるのを防ぎます。
-        */
         .main-container { 
             position: relative; 
             width: 100vw; 
             height: 100vh; 
-            /* スマホで画像が縦に潰れないように比率を強制維持 */
             max-height: 56.25vw; 
             background-image: url('main_bg.png?v=2'); 
             background-size: 100% 100%; 
             background-position: center; 
             background-repeat: no-repeat; 
-            display: block; 
+            display: none; /* 初期状態は非表示、名前確定後に表示 */
         }
 
-        /* PCのような横長画面（16:9以上）の場合は、高さを100vhに固定して黒帯を消す */
         @media (min-aspect-ratio: 16/9) {
             .main-container {
                 max-height: 100vh;
             }
         }
 
+        /* 名前入力オーバーレイのスタイル修正 */
+        #loginOverlay { 
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            display: none; /* JSで制御 */
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+        .login-card {
+            background: #222;
+            padding: 40px;
+            border-radius: 20px;
+            border: 2px solid #4ade80;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(74, 222, 128, 0.3);
+        }
+        .login-card h2 { color: #4ade80; margin-bottom: 20px; }
+        #userNameInput {
+            width: 80%;
+            padding: 15px;
+            font-size: 20px;
+            border-radius: 10px;
+            border: none;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .btn-join {
+            background: #4ade80;
+            color: black;
+            padding: 15px 30px;
+            font-size: 20px;
+            font-weight: bold;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
         .user-badge { position: absolute; top: 2%; left: 2%; background: rgba(0, 0, 0, 0.7); color: #4ade80; padding: 10px 20px; border-radius: 30px; font-size: 1.2vw; font-weight: bold; border: 1px solid #4ade80; z-index: 200; display: flex; align-items: center; gap: 10px; }
         .user-badge::before { content: "●"; color: #22c55e; animation: blink 2s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
-
-        #loginOverlay { display: none; }
 
         .number-selector { position: absolute; top: 22.2%; left: 15.5%; width: 69.0%; height: 32.0%; display: flex; justify-content: space-between; align-items: center; z-index: 100; }
         .num-div { width: 16%; height: 95%; cursor: pointer; border-radius: 15px; transition: 0.2s; position: relative; }
@@ -58,14 +89,17 @@
     </style>
 </head>
 <body>
+    <!-- 入力オーバーレイ -->
     <div id="loginOverlay">
         <div class="login-card">
             <h2>WELCOME!</h2>
             <input type="text" id="userNameInput" placeholder="例：ポギー">
+            <br>
             <button class="btn-join" onclick="joinGame()">ROULETTE START</button>
         </div>
     </div>
 
+    <!-- ゲームコンテナ -->
     <div class="main-container" id="gameContainer">
         <div class="user-badge">PLAYER: <span id="displayNickName">----</span></div>
         <div class="number-selector">
@@ -97,17 +131,49 @@
         const urlParams = new URLSearchParams(window.location.search);
         const urlID = urlParams.get('user');
         const urlKey = urlParams.get('key'); 
+        const urlReset = urlParams.get('reset'); // リセット判定
 
         window.onload = () => {
+            // URLからID/Keyを取得、なければ保存分を使用
             myID = urlID || localStorage.getItem('poggi_user_id');
             myKey = urlKey || localStorage.getItem('poggi_user_key');
-            myNick = localStorage.getItem('poggi_user_nick') || "GUEST";
-            if (urlID && urlKey) {
+            
+            // 強制リセット指示がある場合
+            if (urlReset === "true") {
+                localStorage.removeItem('poggi_user_nick');
+            }
+
+            myNick = localStorage.getItem('poggi_user_nick');
+
+            // ID/Keyの保存
+            if (myID && myKey) {
                 localStorage.setItem('poggi_user_id', myID);
                 localStorage.setItem('poggi_user_key', myKey);
             }
-            showGame();
+
+            // 名前の有無で分岐
+            if (!myNick || myNick === "GUEST" || myNick === "----") {
+                showLogin();
+            } else {
+                showGame();
+            }
         };
+
+        function showLogin() {
+            document.getElementById('loginOverlay').style.display = 'flex';
+            document.getElementById('gameContainer').style.display = 'none';
+        }
+
+        function joinGame() {
+            const input = document.getElementById('userNameInput').value.trim();
+            if (!input) {
+                alert("名前を入力してください。");
+                return;
+            }
+            myNick = input;
+            localStorage.setItem('poggi_user_nick', myNick);
+            showGame();
+        }
 
         function showGame() {
             document.getElementById('loginOverlay').style.display = 'none';
@@ -120,6 +186,7 @@
             ws = new WebSocket("wss://" + NGROK_URL);
             ws.onopen = () => { 
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "sub", "events": { "General": ["Custom"] } }));
+                // ボットに名前を保存させるアクションを呼び出し
                 ws.send(JSON.stringify({ "request": "DoAction", "id": "save_name", "action": { "name": "SaveUserName" }, "args": { "targetUser": myID, "userName": myNick } }));
                 manualRefresh();
             };
