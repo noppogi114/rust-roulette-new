@@ -60,7 +60,7 @@
         .name { text-align: left; }
         .points { text-align: right; color: #4ade80; font-family: monospace; font-weight: bold; width: 100px; }
 
-        /* ボーナス文字のアニメーション */
+        /* ポップアップ通知のアニメーション */
         #bonus-alert {
             position: absolute;
             top: 50%;
@@ -71,7 +71,7 @@
             padding: 15px 30px;
             border-radius: 50px;
             font-weight: bold;
-            font-size: 28px;
+            font-size: 22px; /* 少し文字を調整 */
             white-space: nowrap;
             z-index: 100;
             opacity: 0;
@@ -80,7 +80,7 @@
             box-shadow: 0 0 20px rgba(255, 215, 0, 0.8);
         }
         #bonus-alert.show {
-            transform: translate(-50%, -50%) scale(1.2);
+            transform: translate(-50%, -50%) scale(1.1);
             opacity: 1;
         }
     </style>
@@ -88,7 +88,7 @@
 <body>
     <div class="board" id="main-board">
         <div id="patrol-light"></div>
-        <div id="bonus-alert">💰 BONUS +1000pt</div>
+        <div id="bonus-alert">💰 BONUS!</div>
 
         <h2 id="st">🏆 TOP 10 RANKING</h2>
         <table><tbody id="ranking-body"><tr><td colspan="3" style="text-align:center;">接続待機中...</td></tr></tbody></table>
@@ -117,8 +117,22 @@
                 const res = JSON.parse(e.data);
                 const d = res.data || res;
 
-                if (d.poggi_msg && d.poggi_msg.includes("ボーナス")) {
-                    triggerBonusVisual();
+                // --- 演出のトリガー判定 ---
+                if (d.poggi_msg) {
+                    const msg = d.poggi_msg;
+                    const alertElem = document.getElementById('bonus-alert');
+
+                    // 表示するテキストを設定
+                    alertElem.innerText = msg.replace("💬 ", "");
+
+                    // 「ボーナス」が含まれる場合のみパトライトを回す
+                    if (msg.includes("ボーナス")) {
+                        triggerBonusVisual(true);
+                    } 
+                    // 「Like」や「TwiCa」が含まれる場合はパトライトなしでポップアップ
+                    else if (msg.includes("Like") || msg.includes("TwiCa")) {
+                        triggerBonusVisual(false);
+                    }
                 }
 
                 if (res.id === "gr" && res.status === "ok" && res.variables) {
@@ -139,11 +153,14 @@
             };
         }
 
-        function triggerBonusVisual() {
+        // usePatrol が true の時だけパトライトを起動
+        function triggerBonusVisual(usePatrol) {
             const board = document.getElementById('main-board');
             const alert = document.getElementById('bonus-alert');
 
-            document.body.classList.add('rotating');
+            if (usePatrol) {
+                document.body.classList.add('rotating');
+            }
             board.classList.add('bonus-active');
             alert.classList.add('show');
 
