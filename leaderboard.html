@@ -33,13 +33,12 @@
             transform: translateX(-50%);
             width: 60px;
             height: 40px;
-            background: #440000; /* 通常時は暗い赤 */
+            background: #440000;
             border-radius: 25px 25px 5px 5px;
             display: none;
             z-index: 110;
         }
 
-        /* パトライト回転点滅アニメーション */
         .rotating #patrol-light {
             display: block;
             animation: patrol-glow 0.15s infinite;
@@ -60,7 +59,7 @@
         .rank { width: 35px; text-align: center; font-weight: bold; color: #ffd700; }
         .points { text-align: right; color: #4ade80; font-family: monospace; font-weight: bold; }
 
-        /* ボーナス文字のアニメーション */
+        /* ボーナス文字のアニメーション（元に戻しました） */
         #bonus-alert {
             position: absolute;
             top: 50%;
@@ -87,11 +86,8 @@
 </head>
 <body>
     <div class="board" id="main-board">
-        <!-- パトライト本体 -->
         <div id="patrol-light"></div>
-
-        <!-- ボーナス時の飛び出す文字 -->
-        <div id="bonus-alert">🚨 KYU-IN! +1000pt</div>
+        <div id="bonus-alert">💰 BONUS +1000pt</div>
 
         <h2 id="st">🏆 TOP 10 RANKING</h2>
         <table><tbody id="ranking-body"><tr><td colspan="3" style="text-align:center;">接続待機中...</td></tr></tbody></table>
@@ -101,40 +97,25 @@
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
         let ws;
 
-        // 効果音の読み込み (Googleの短いアラーム音を仮セット)
-        const kyuInSound = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
-
         function connect() {
             ws = new WebSocket("wss://" + NGROK_URL);
             
             ws.onopen = () => {
                 document.getElementById('st').innerText = "🏆 RANKING (CONNECTED)";
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "ranking", "events": { "General": ["Custom"] } }));
-                
-                ws.send(JSON.stringify({
-                    "request": "DoAction",
-                    "id": "init_ranking",
-                    "action": { "name": "GetLeaderboard" }
-                }));
+                ws.send(JSON.stringify({ "request": "DoAction", "id": "init_ranking", "action": { "name": "GetLeaderboard" } }));
 
                 setInterval(() => {
                     if(ws.readyState === WebSocket.OPEN) {
-                        ws.send(JSON.stringify({ 
-                            "request": "GetGlobalVariable", 
-                            "id": "gr", 
-                            "variable": "current_leaderboard_json", 
-                            "persisted": true 
-                        }));
+                        ws.send(JSON.stringify({ "request": "GetGlobalVariable", "id": "gr", "variable": "current_leaderboard_json", "persisted": true }));
                     }
                 }, 10000);
             };
 
             ws.onmessage = (e) => {
                 const res = JSON.parse(e.data);
-                let list = null;
                 const d = res.data || res;
 
-                // ボーナス通知の受信処理
                 if (d.poggi_msg && d.poggi_msg.includes("ボーナス")) {
                     triggerBonusVisual();
                 }
@@ -142,15 +123,12 @@
                 if (res.id === "gr" && res.status === "ok" && res.variables) {
                     const rawVal = res.variables.current_leaderboard_json;
                     if (rawVal) {
-                        list = typeof rawVal === 'string' ? JSON.parse(rawVal) : rawVal;
+                        const list = typeof rawVal === 'string' ? JSON.parse(rawVal) : rawVal;
+                        updateUI(list);
                     }
                 } 
                 else if (d.type === "leaderboard") {
-                    list = d.data;
-                }
-
-                if (list && Array.isArray(list)) {
-                    updateUI(list);
+                    updateUI(d.data);
                 }
             };
 
@@ -160,21 +138,14 @@
             };
         }
 
-        // --- パトライト＆効果音＆視覚演出の実行 ---
         function triggerBonusVisual() {
             const board = document.getElementById('main-board');
             const alert = document.getElementById('bonus-alert');
 
-            // 音を鳴らす
-            kyuInSound.currentTime = 0;
-            kyuInSound.play().catch(e => console.log("Audio play blocked"));
-
-            // クラス付与 (パトライト回転とボード発光)
             document.body.classList.add('rotating');
             board.classList.add('bonus-active');
             alert.classList.add('show');
 
-            // 4秒後に演出を終了
             setTimeout(() => {
                 document.body.classList.remove('rotating');
                 board.classList.remove('bonus-active');
@@ -185,21 +156,13 @@
         function updateUI(list) {
             const body = document.getElementById('ranking-body');
             body.innerHTML = "";
-            if (list.length === 0) {
-                body.innerHTML = '<tr><td colspan="3" style="text-align:center;">データがありません</td></tr>';
-                return;
-            }
+            if (!list || list.length === 0) return;
             list.forEach((u, i) => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `
-                    <td class="rank">${i+1}</td>
-                    <td>${u.name}</td>
-                    <td class="points">${Number(u.p).toLocaleString()}</td>
-                `;
+                tr.innerHTML = `<td class="rank">${i+1}</td><td>${u.name}</td><td class="points">${Number(u.p).toLocaleString()}</td>`;
                 body.appendChild(tr);
             });
         }
-
         connect();
     </script>
 </body>
