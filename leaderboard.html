@@ -53,13 +53,14 @@
         h2 { margin: 0 0 10px 0; text-align: center; color: #4ade80; border-bottom: 1px solid #4ade80; padding-bottom: 8px; font-size: 18px; transition: 0.3s; }
         .bonus-active h2 { color: #ffd700; border-bottom-color: #ffd700; }
 
-        table { width: 100%; border-collapse: collapse; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
         tr { border-bottom: 1px solid #333; }
-        td { padding: 8px 5px; font-size: 15px; }
+        td { padding: 8px 5px; font-size: 15px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
         .rank { width: 35px; text-align: center; font-weight: bold; color: #ffd700; }
-        .points { text-align: right; color: #4ade80; font-family: monospace; font-weight: bold; }
+        .name { text-align: left; }
+        .points { text-align: right; color: #4ade80; font-family: monospace; font-weight: bold; width: 100px; }
 
-        /* ボーナス文字のアニメーション（元に戻しました） */
+        /* ボーナス文字のアニメーション */
         #bonus-alert {
             position: absolute;
             top: 50%;
@@ -159,7 +160,11 @@
             if (!list || list.length === 0) return;
             list.forEach((u, i) => {
                 const tr = document.createElement('tr');
-                tr.innerHTML = `<td class="rank">${i+1}</td><td>${u.name}</td><td class="points">${Number(u.p).toLocaleString()}</td>`;
+                tr.innerHTML = `
+                    <td class="rank">${i+1}</td>
+                    <td class="name">${u.name}</td>
+                    <td class="points">${Number(u.p).toLocaleString()}</td>
+                `;
                 body.appendChild(tr);
             });
         }
