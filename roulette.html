@@ -16,7 +16,7 @@
             background-size: 100% 100%; 
             background-position: center; 
             background-repeat: no-repeat; 
-            display: none; /* 初期状態は非表示、名前確定後に表示 */
+            display: none; 
         }
 
         @media (min-aspect-ratio: 16/9) {
@@ -25,13 +25,12 @@
             }
         }
 
-        /* 名前入力オーバーレイのスタイル修正 */
         #loginOverlay { 
             position: fixed;
             top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(0,0,0,0.9);
             z-index: 1000;
-            display: none; /* JSで制御 */
+            display: none; 
             justify-content: center;
             align-items: center;
             color: white;
@@ -89,7 +88,6 @@
     </style>
 </head>
 <body>
-    <!-- 入力オーバーレイ -->
     <div id="loginOverlay">
         <div class="login-card">
             <h2>WELCOME!</h2>
@@ -99,7 +97,6 @@
         </div>
     </div>
 
-    <!-- ゲームコンテナ -->
     <div class="main-container" id="gameContainer">
         <div class="user-badge">PLAYER: <span id="displayNickName">----</span></div>
         <div class="number-selector">
@@ -131,27 +128,23 @@
         const urlParams = new URLSearchParams(window.location.search);
         const urlID = urlParams.get('user');
         const urlKey = urlParams.get('key'); 
-        const urlReset = urlParams.get('reset'); // リセット判定
+        const urlReset = urlParams.get('reset');
 
         window.onload = () => {
-            // URLからID/Keyを取得、なければ保存分を使用
             myID = urlID || localStorage.getItem('poggi_user_id');
             myKey = urlKey || localStorage.getItem('poggi_user_key');
             
-            // 強制リセット指示がある場合
             if (urlReset === "true") {
                 localStorage.removeItem('poggi_user_nick');
             }
 
             myNick = localStorage.getItem('poggi_user_nick');
 
-            // ID/Keyの保存
             if (myID && myKey) {
                 localStorage.setItem('poggi_user_id', myID);
                 localStorage.setItem('poggi_user_key', myKey);
             }
 
-            // 名前の有無で分岐
             if (!myNick || myNick === "GUEST" || myNick === "----") {
                 showLogin();
             } else {
@@ -186,7 +179,6 @@
             ws = new WebSocket("wss://" + NGROK_URL);
             ws.onopen = () => { 
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "sub", "events": { "General": ["Custom"] } }));
-                // ボットに名前を保存させるアクションを呼び出し
                 ws.send(JSON.stringify({ "request": "DoAction", "id": "save_name", "action": { "name": "SaveUserName" }, "args": { "targetUser": myID, "userName": myNick } }));
                 manualRefresh();
             };
@@ -195,6 +187,13 @@
                 const res = JSON.parse(event.data);
                 const d = res.data || res;
                 if (d.targetUser === myID) {
+                    // ★重要：ボット側の名前変数が空の場合、ブラウザの保存を消してリロード
+                    if (d.name === "") {
+                        localStorage.removeItem('poggi_user_nick');
+                        location.reload();
+                        return;
+                    }
+
                     if (d.p !== undefined) document.getElementById('userPoints').innerText = Number(d.p).toLocaleString();
                     ["1", "3", "5", "10", "20"].forEach(num => {
                         const key = "b" + num;
