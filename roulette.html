@@ -3,75 +3,143 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>POGGI RUST ROULETTE</title>
+    <title>POGGI RUST ROULETTE (HYPER SYNC)</title>
     <style>
         body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; display: flex; justify-content: center; align-items: center; font-family: sans-serif; }
-        .main-container { position: relative; width: 100vw; height: 100vh; max-height: 56.25vw; background-image: url('main_bg.png?v=3'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; display: block; }
-        @media (min-aspect-ratio: 16/9) { .main-container { max-height: 100vh; } }
-        .user-badge { position: absolute; top: 2.2%; left: 2.2%; background: rgba(0, 0, 0, 0.7); color: #4ade80; padding: 0.8% 2%; border-radius: 30px; font-size: 1.2vw; font-weight: bold; border: 1px solid #4ade80; z-index: 200; display: flex; align-items: center; gap: 10px; }
-        .number-selector { position: absolute; top: 22.2%; left: 14.5%; width: 71.0%; height: 32.0%; display: flex; justify-content: space-between; align-items: center; z-index: 100; }
+        
+        /* 背景画像は .png で固定。キャッシュ回避のため v=2 に設定 */
+        .main-container { position: relative; width: 100vw; height: 100vh; background-image: url('main_bg.png?v=3'); background-size: 100% 100%; background-position: center; background-repeat: no-repeat; display: block; }
+        
+        @media (min-aspect-ratio: 16/9) {
+            .main-container {
+                max-height: 100vh;
+            }
+        }
+
+        .user-badge { position: absolute; top: 2%; left: 2%; background: rgba(0, 0, 0, 0.7); color: #4ade80; padding: 10px 20px; border-radius: 30px; font-size: 1.2vw; font-weight: bold; border: 1px solid #4ade80; z-index: 200; display: flex; align-items: center; gap: 10px; }
+        .user-badge::before { content: "●"; color: #22c55e; animation: blink 2s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+        /* ログイン画面は非表示 */
+        #loginOverlay { display: none; }
+
+        .number-selector { position: absolute; top: 22.2%; left: 15.5%; width: 69.0%; height: 32.0%; display: flex; justify-content: space-between; align-items: center; z-index: 100; }
         .num-div { width: 16%; height: 95%; cursor: pointer; border-radius: 15px; transition: 0.2s; position: relative; }
-        .num-div.selected { background: rgba(255, 255, 255, 0.3); box-shadow: 0 0 20px 5px #ffffff; border: 2px solid #ffffff; }
-        .final-bet-div { position: absolute; top: 56.5%; left: 44.5%; width: 11.0%; height: 25.0%; cursor: pointer; z-index: 110; }
-        .input-amount { position: absolute; top: 62.8%; left: 14.5%; width: 28.0%; height: 6.0%; background: transparent; border: none; outline: none; color: #ffffff; font-size: 2.5vw; text-align: center; font-weight: bold; z-index: 110; }
+        .num-div.selected { background: rgba(255, 255, 255, 0.4); box-shadow: 0 0 25px 10px #ffffff; border: 2px solid #ffffff; }
+        
+        .cancel-btn { position: absolute; top: -10px; right: -10px; width: 35px; height: 35px; background: #ff4444; color: white; border-radius: 50%; display: none; justify-content: center; align-items: center; font-size: 20px; font-weight: bold; box-shadow: 0 0 10px rgba(0,0,0,0.5); border: 2px solid #fff; z-index: 120; cursor: pointer; }
+        .final-bet-div { position: absolute; top: 55.5%; left: 44.5%; width: 11.5%; height: 25.0%; cursor: pointer; z-index: 110; }
+        .input-amount { position: absolute; top: 62.5%; left: 14.5%; width: 28.0%; height: 6.0%; background: transparent; border: none; outline: none; color: #ffffff; font-size: 2.5vw; text-align: center; font-weight: bold; z-index: 110; }
+        
+        /* 所持ポイント数値表示エリア */
         .points-display { position: absolute; top: 74.8%; left: 14.5%; width: 28.0%; height: 6.0%; display: flex; justify-content: center; align-items: center; color: #ffffff; font-size: 2.5vw; font-weight: bold; }
+        
+        /* 【更新ボタン】背景の「更新」マークの位置に重ねる透明な判定エリア */
         .refresh-trigger { position: absolute; top: 74.5%; left: 37.0%; width: 5.5%; height: 7.0%; cursor: pointer; z-index: 150; }
-        .status-display { position: absolute; top: 92.5%; left: 55.0%; width: 35.0%; height: 6.0%; display: flex; align-items: center; justify-content: center; font-size: 2.2vw; font-weight: bold; color: #ffffff; }
+
+        .status-display { position: absolute; top: 92.5%; left: 55.0%; width: 35.0%; height: 6.0%; display: flex; align-items: center; justify-content: center; font-size: 2.2vw; font-weight: bold; color: #ffffff; text-shadow: 2px 2px 4px #000; }
+        .bet-label { position: absolute; bottom: -25px; left: 0; width: 100%; text-align: center; color: #ffd700; font-size: 1.5vw; font-weight: bold; text-shadow: 2px 2px 2px #000; pointer-events: none; white-space: nowrap; }
+        
+        /* ポップアップ（当選・ハズレ通知用） */
+        #betPopup { position: absolute; top: 20%; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.95); padding: 30px 60px; border-radius: 15px; font-size: 2.8vw; font-weight: bold; z-index: 999; display: none; text-shadow: 2px 2px 4px #000; white-space: nowrap; border: 4px solid #ffd700; color: #ffd700; }
+        .popup-close { position: absolute; top: 5px; right: 15px; color: white; font-size: 2vw; cursor: pointer; opacity: 0.6; }
+        .popup-close:hover { opacity: 1; }
     </style>
 </head>
 <body>
-    <div class="main-container">
-        <div class="user-badge">● PLAYER: <span id="displayNickName">----</span></div>
+    <div id="loginOverlay">
+        <div class="login-card">
+            <h2>WELCOME!</h2>
+            <input type="text" id="userNameInput" placeholder="例：ポギー">
+            <button class="btn-join" onclick="joinGame()">ROULETTE START</button>
+        </div>
+    </div>
+
+    <div class="main-container" id="gameContainer">
+        <div class="user-badge">PLAYER: <span id="displayNickName">----</span></div>
         <div class="number-selector">
-            <div class="num-div" onclick="selectNumber('1', this)"></div>
-            <div class="num-div" onclick="selectNumber('3', this)"></div>
-            <div class="num-div" onclick="selectNumber('5', this)"></div>
-            <div class="num-div" onclick="selectNumber('10', this)"></div>
-            <div class="num-div" onclick="selectNumber('20', this)"></div>
+            <div class="num-div" onclick="selectNumber('1', this)"><div class="cancel-btn" id="cancel-1" onclick="cancelBet('1', event)">&times;</div><div id="bet-1" class="bet-label"></div></div>
+            <div class="num-div" onclick="selectNumber('3', this)"><div class="cancel-btn" id="cancel-3" onclick="cancelBet('3', event)">&times;</div><div id="bet-3" class="bet-label"></div></div>
+            <div class="num-div" onclick="selectNumber('5', this)"><div class="cancel-btn" id="cancel-5" onclick="cancelBet('5', event)">&times;</div><div id="bet-5" class="bet-label"></div></div>
+            <div class="num-div" onclick="selectNumber('10', this)"><div class="cancel-btn" id="cancel-10" onclick="cancelBet('10', event)">&times;</div><div id="bet-10" class="bet-label"></div></div>
+            <div class="num-div" onclick="selectNumber('20', this)"><div class="cancel-btn" id="cancel-20" onclick="cancelBet('20', event)">&times;</div><div id="bet-20" class="bet-label"></div></div>
         </div>
         <div class="final-bet-div" onclick="executeBet()"></div>
         <input type="number" class="input-amount" id="betAmount" value="100">
         <div class="points-display" id="userPoints">0</div>
+        
+        <!-- 更新ボタンの判定エリア -->
         <div class="refresh-trigger" onclick="manualRefresh()"></div>
+
         <div class="status-display" id="betStatus">CONNECTING...</div>
+        
+        <div id="betPopup">
+            <span class="popup-close" onclick="hidePopup()">&times;</span>
+            <span id="popupContent"></span>
+        </div>
     </div>
 
     <script>
         const NGROK_URL = "sombre-ellison-overdelicately.ngrok-free.dev"; 
-        let ws, selectedNum = "", isBettingOpen = false, myID = "", myKey = "", myNick = "";
+        let ws, selectedNum = "", isBettingOpen = false, popupTimer = null, myID = "", myKey = "", myNick = "";
+        let betRecords = { "1": 0, "3": 0, "5": 0, "10": 0, "20": 0 };
 
         const urlParams = new URLSearchParams(window.location.search);
-        myID = urlParams.get('user') || localStorage.getItem('poggi_user_id');
-        myKey = urlParams.get('key') || localStorage.getItem('poggi_user_key');
-        myNick = localStorage.getItem('poggi_user_nick') || "Guest";
+        const urlID = urlParams.get('user');
+        const urlKey = urlParams.get('key'); 
 
         window.onload = () => {
-            if (urlParams.get('user')) {
+            myID = urlID || localStorage.getItem('poggi_user_id');
+            myKey = urlKey || localStorage.getItem('poggi_user_key');
+            myNick = localStorage.getItem('poggi_user_nick') || "GUEST";
+
+            if (urlID && urlKey) {
                 localStorage.setItem('poggi_user_id', myID);
                 localStorage.setItem('poggi_user_key', myKey);
             }
+            showGame();
+        };
+
+        function showGame() {
+            document.getElementById('loginOverlay').style.display = 'none';
+            document.getElementById('gameContainer').style.display = 'block';
             document.getElementById('displayNickName').innerText = myNick;
             connect();
-        };
+        }
 
         function connect() {
             ws = new WebSocket("wss://" + NGROK_URL);
-            ws.onopen = () => {
+            ws.onopen = () => { 
                 document.getElementById('betStatus').innerText = "CONNECTED";
                 ws.send(JSON.stringify({ "request": "Subscribe", "id": "sub", "events": { "General": ["Custom"] } }));
                 manualRefresh();
             };
+
             ws.onmessage = (event) => {
                 const res = JSON.parse(event.data);
                 const d = res.data || res;
                 if (d.targetUser === myID) {
                     if (d.p !== undefined) document.getElementById('userPoints').innerText = Number(d.p).toLocaleString();
+                    
+                    // 当選・ハズレメッセージの表示処理
+                    if (d.poggi_msg !== undefined) {
+                        showPopup(d.poggi_msg, d.poggi_msg.includes("当選") ? "pop-win" : "pop-error", 6000);
+                    }
+
+                    ["1", "3", "5", "10", "20"].forEach(num => {
+                        const key = "b" + num;
+                        if (d[key] !== undefined) {
+                            betRecords[num] = d[key];
+                            updateUIVisibility(num, d[key]);
+                        }
+                    });
                 }
                 if (d.is_open !== undefined) {
                     isBettingOpen = (d.is_open == 1 || d.is_open === true);
                     const el = document.getElementById('betStatus');
-                    el.innerText = isBettingOpen ? "受付中" : "受付終了";
+                    el.innerText = isBettingOpen ? "受付開始" : "受付終了";
                     el.style.color = isBettingOpen ? "#22c55e" : "#ef4444";
+                    if (isBettingOpen) resetLocalBets();
                 }
             };
             ws.onclose = () => {
@@ -82,20 +150,65 @@
 
         function manualRefresh() {
             if (ws && ws.readyState === WebSocket.OPEN) {
-                ws.send(JSON.stringify({ "request": "DoAction", "id": "refresh", "action": { "name": "SEND_USER_POINTS" }, "args": { "targetUser": myID } }));
+                ws.send(JSON.stringify({ 
+                    "request": "DoAction", 
+                    "id": "refresh_req", 
+                    "action": { "name": "SEND_USER_POINTS" }, 
+                    "args": { "targetUser": myID } 
+                }));
             }
         }
 
         function selectNumber(num, element) {
+            if(!isBettingOpen) return;
             selectedNum = num;
             document.querySelectorAll('.num-div').forEach(d => d.classList.remove('selected'));
             element.classList.add('selected');
         }
 
+        function updateUIVisibility(num, amount) {
+            const label = document.getElementById('bet-' + num);
+            const btn = document.getElementById('cancel-' + num);
+            if (label) label.innerText = amount > 0 ? amount + " jobo" : "";
+            if (btn) btn.style.display = amount > 0 ? "flex" : "none";
+        }
+
+        function cancelBet(num, event) {
+            if (event) event.stopPropagation();
+            if(!isBettingOpen || betRecords[num] <= 0) return;
+            ws.send(JSON.stringify({ "request": "DoAction", "id": "cancel_" + Date.now(), "action": { "name": "BET KAKE" }, "args": { "betTarget": String(num), "betAmount": "0", "targetUser": myID, "key": myKey } }));
+        }
+
         function executeBet() {
             if(!isBettingOpen || !selectedNum) return;
-            const amount = document.getElementById('betAmount').value;
-            ws.send(JSON.stringify({ "request": "DoAction", "id": "bet", "action": { "name": "BET KAKE" }, "args": { "betTarget": selectedNum, "betAmount": amount, "targetUser": myID, "key": myKey } }));
+            const amountInput = document.getElementById('betAmount').value;
+            const amount = parseInt(amountInput);
+            if (isNaN(amount) || amount <= 0) return;
+            const currentTotal = parseInt(document.getElementById('userPoints').innerText.replace(/,/g, ""));
+            if (currentTotal + betRecords[selectedNum] < amount) { showPopup("ポイント不足", "pop-error", 3000); return; }
+            ws.send(JSON.stringify({ "request": "DoAction", "id": "bet_" + Date.now(), "action": { "name": "BET KAKE" }, "args": { "betTarget": String(selectedNum), "betAmount": String(amount), "targetUser": myID, "key": myKey } }));
+        }
+
+        function resetLocalBets() {
+            betRecords = { "1": 0, "3": 0, "5": 0, "10": 0, "20": 0 };
+            ["1", "3", "5", "10", "20"].forEach(num => updateUIVisibility(num, 0));
+            document.querySelectorAll('.num-div').forEach(d => d.classList.remove('selected'));
+            selectedNum = "";
+        }
+
+        function showPopup(text, className, duration) {
+            const p = document.getElementById('betPopup');
+            const content = document.getElementById('popupContent');
+            if(popupTimer) clearTimeout(popupTimer);
+            content.innerText = text; 
+            p.style.display = 'block';
+            popupTimer = setTimeout(hidePopup, duration);
+        }
+
+        function hidePopup() {
+            const p = document.getElementById('betPopup');
+            p.style.display = 'none';
+            if(popupTimer) clearTimeout(popupTimer);
         }
     </script>
 </body>
