@@ -18,13 +18,13 @@
             font-family: sans-serif; 
         }
         
-        /* 基本は画面いっぱいに表示（PC用） */
+        /* 基本は画面いっぱいに表示（PC用：余白を消す） */
         .main-container { 
             position: relative; 
             width: 100vw; 
             height: 100vh; 
             background-image: url('main_bg.png?v=3'); 
-            background-size: 100% 100%; /* PCでは全体に広げる */
+            background-size: 100% 100%; 
             background-position: center; 
             background-repeat: no-repeat; 
             display: block; 
@@ -104,15 +104,19 @@
         const urlParams = new URLSearchParams(window.location.search);
         const urlID = urlParams.get('user');
         const urlKey = urlParams.get('key'); 
+        const urlNick = urlParams.get('nick'); // 追加：URLからニックネームを取得
 
         window.onload = () => {
             myID = urlID || localStorage.getItem('poggi_user_id');
             myKey = urlKey || localStorage.getItem('poggi_user_key');
-            myNick = localStorage.getItem('poggi_user_nick') || "GUEST";
+            
+            // 追加：URLにニックネームがあれば最優先。なければ保存、最後はGUEST
+            myNick = urlNick || localStorage.getItem('poggi_user_nick') || "GUEST";
 
-            if (urlID && urlKey) {
+            if (myID && myKey) {
                 localStorage.setItem('poggi_user_id', myID);
                 localStorage.setItem('poggi_user_key', myKey);
+                localStorage.setItem('poggi_user_nick', myNick);
             }
             showGame();
         };
@@ -120,7 +124,8 @@
         function showGame() {
             document.getElementById('loginOverlay').style.display = 'none';
             document.getElementById('gameContainer').style.display = 'block';
-            document.getElementById('displayNickName').innerText = myNick;
+            // 日本語の名前も正しく表示するために decodeURIComponent を使用
+            document.getElementById('displayNickName').innerText = decodeURIComponent(myNick);
             connect();
         }
 
